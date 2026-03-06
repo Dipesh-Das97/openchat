@@ -3347,6 +3347,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"nodemailer@npm:^8.0.1":
+  version: 8.0.1
+  resolution: "nodemailer@npm:8.0.1"
+  checksum: a7bc02f7cfc946ad18d092b58fbf0e628294bcb2f040be782e3a53d7dea21141d2e75f7ac14e23b1f42aa6498236eda49e9286a9c3f2bb9c02d8e4c102f65656
+  languageName: node
+  linkType: hard
+
 "nodemon@npm:^3.1.14":
   version: 3.1.14
   resolution: "nodemon@npm:3.1.14"
@@ -3925,6 +3932,7 @@ __metadata:
     express: ^5.2.1
     firebase-admin: ^13.7.0
     jsonwebtoken: ^9.0.3
+    nodemailer: ^8.0.1
     nodemon: ^3.1.14
   languageName: unknown
   linkType: soft

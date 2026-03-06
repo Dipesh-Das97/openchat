@@ -1,14 +1,9 @@
 const admin = require('firebase-admin');
-
-const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-};
+const serviceAccount = require('./serviceAccount.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}-default-rtdb.asia-south1.firebasedatabase.app`,
+  databaseURL: process.env.FIREBASE_DATABASE_URL,
 });
 
 const db = admin.database();

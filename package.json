@@ -1,0 +1,16 @@
+{
+  "name": "openchat",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "yarn@4.5.3",
+  "workspaces": [
+    "server",
+    "dashboard",
+    "widget"
+  ],
+  "scripts": {
+    "server": "yarn workspace server dev",
+    "dashboard": "yarn workspace dashboard dev",
+    "widget": "yarn workspace widget build"
+  }
+}

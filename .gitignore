@@ -1,0 +1,59 @@
+# ─── Dependencies ───────────────────────────────
+node_modules/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ─── Environment Variables ───────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# ─── Firebase ────────────────────────────────────
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*-service-account.json
+*-firebase-adminsdk-*.json
+
+# ─── Build Outputs ───────────────────────────────
+dist/
+build/
+widget/dist/
+
+# ─── Vite / Dashboard ────────────────────────────
+dashboard/dist/
+dashboard/.vite/
+
+# ─── OS Files ────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE / Editor ────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ─── Logs ────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Testing ─────────────────────────────────────
+coverage/
+.nyc_output/
+
+# --- Yarn ----------------------------------------
+.yarn/cache         
+.yarn/unplugged    
+.yarn/build-state.yml 
+.yarn/install-state.gz 

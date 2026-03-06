@@ -292,6 +292,69 @@ yarn widget
 
 ---
 
+## 🛠️ Running Locally
+
+### Start the Server
+```bash
+# From root
+yarn server
+```
+Server runs on http://localhost:5000
+
+### Test the Server
+```bash
+curl http://localhost:5000/api/health
+# Expected: {"status":"ok","message":"OpenChat server is running"}
+```
+
+### Start the Dashboard
+```bash
+# From root
+yarn dashboard
+```
+
+### Build the Widget
+```bash
+# From root
+yarn widget
+```
+
+---
+
+## 🔌 API Endpoints
+
+### Auth
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/auth/register` | Register new agent | No |
+| POST | `/api/auth/login` | Login agent | No |
+| GET | `/api/auth/me` | Get current agent | Yes |
+
+### Conversations
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/conversations` | Get all conversations | Yes |
+| PUT | `/api/conversations/:id/status` | Update conversation status | Yes |
+
+### Health
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/health` | Server health check | No |
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Phase 0 — Project setup + monorepo
+- [x] Phase 1 — Firebase + Auth + Data Model
+- [ ] Phase 2 — Onboarding Wizard
+- [ ] Phase 3 — Embeddable Widget
+- [ ] Phase 4 — Agent Dashboard
+- [ ] Phase 5 — AI Fallback & Smart Timers
+- [ ] Phase 6 — E2E Encryption
+- [ ] Phase 7 — Polish & GitHub Release
+
+
 ## 🗺️ Roadmap
 
 - [x] Phase 0 — Project setup + monorepo

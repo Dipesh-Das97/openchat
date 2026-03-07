@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAgentStore from '../store/agentStore';
 import { db } from '../firebase';
@@ -10,17 +10,21 @@ import StatusToggle from '../components/StatusToggle';
 import Settings from './Settings';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Leads from './Leads';
+import { useNotifications } from '../hooks/useNotifications';
 
 export default function Dashboard() {
     const navigate = useNavigate();
     const { token, installId, agent, logout, setAgent, rehydrateFirebase } = useAgentStore();
     const isMobile = useIsMobile();
 
+    const { requestPermission, notify } = useNotifications();
+
     const [conversations, setConversations] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
     const [isOnline, setIsOnline] = useState(false);
     const [view, setView] = useState('conversations');
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const prevConversationsRef = useRef({});
 
     useEffect(() => {
         if (!token) navigate('/login');
@@ -29,7 +33,7 @@ export default function Dashboard() {
     // Add this useEffect in Dashboard.jsx
     useEffect(() => {
         if (!token) return;
-
+        requestPermission();
         rehydrateFirebase();
 
         fetch('http://localhost:5000/api/auth/me', {
@@ -41,6 +45,47 @@ export default function Dashboard() {
             })
             .catch(console.error);
     }, [token]);
+
+
+    useEffect(() => {
+        if (!installId) return;
+        const convRef = ref(db, `conversations/${installId}`);
+        const unsub = onValue(convRef, (snap) => {
+            if (!snap.exists()) { setConversations([]); return; }
+
+            const data = snap.val();
+            const list = Object.entries(data)
+                .map(([id, val]) => ({ id, ...val }))
+                .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+
+            // Check for new messages vs previous state
+            list.forEach((conv) => {
+                const prev = prevConversationsRef.current[conv.id];
+                if (
+                    prev &&
+                    conv.lastMessageAt > prev.lastMessageAt &&
+                    conv.id !== selectedId
+                ) {
+                    notify(
+                        `New message from ${conv.visitorName || 'Visitor'}`,
+                        'Click to open the conversation',
+                        () => {
+                            setSelectedId(conv.id);
+                            setView('conversations');
+                        }
+                    );
+                }
+            });
+
+            // Update ref
+            prevConversationsRef.current = Object.fromEntries(
+                list.map((c) => [c.id, c])
+            );
+
+            setConversations(list);
+        });
+        return () => unsub();
+    }, [installId, selectedId]);
 
     useEffect(() => {
         if (!installId) return;

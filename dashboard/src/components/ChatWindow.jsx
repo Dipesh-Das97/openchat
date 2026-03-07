@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ref, onChildAdded, push, set } from 'firebase/database';
+import { ref, onChildAdded, push, set, update } from 'firebase/database';
 import { db } from '../firebase';
 
 const formatTime = (timestamp) => {
@@ -42,32 +42,34 @@ export default function ChatPanel({ conversationId, installId, token }) {
     }, [messages]);
 
     const handleSend = async () => {
-        const text = input.trim();
-        if (!text || loading) return;
+    const text = input.trim();
+    if (!text || loading) return;
 
-        setInput('');
-        setLoading(true);
+    setInput('');
+    setLoading(true);
 
-        try {
-            // Save message to Firebase
-            await push(ref(db, `messages/${conversationId}`), {
-                sender: 'agent',
-                text,
-                timestamp: Date.now(),
-                read: false,
-            });
+    try {
+        await push(ref(db, `messages/${conversationId}`), {
+            sender: 'agent',
+            text,
+            timestamp: Date.now(),
+            read: false,
+        });
 
-            // Update lastMessageAt
-            await set(
-                ref(db, `conversations/${installId}/${conversationId}/lastMessageAt`),
-                Date.now()
-            );
-        } catch (err) {
-            console.error('Failed to send message:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        // Update lastMessageAt + set status back to open
+        await update(
+            ref(db, `conversations/${installId}/${conversationId}`),
+            {
+                lastMessageAt: Date.now(),
+                status: 'open',
+            }
+        );
+    } catch (err) {
+        console.error('Failed to send message:', err);
+    } finally {
+        setLoading(false);
+    }
+};
 
     return (
         <div style={styles.container}>

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, push, onChildAdded, get, set, onValue } from 'firebase/database';
+import { getDatabase, ref, push, onChildAdded, get, set, update, onValue } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC3QVqANPB2PruDDbwc9OQktvLNBMmtGt4",
@@ -17,4 +17,4 @@ export const initFirebase = () => {
 };
 
 export const getDb = () => db;
-export { ref, push, onChildAdded, get, set, onValue };
+export { ref, push, onChildAdded, get, set, onValue, update };

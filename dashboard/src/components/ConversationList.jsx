@@ -2,6 +2,19 @@ import { useEffect, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../firebase';
 
+const getStatusBadge = (status) => {
+    switch (status) {
+        case 'waiting':
+            return { label: 'Waiting', color: '#D97706', bg: '#FEF3C7' };
+        case 'open':
+            return { label: 'Open', color: '#059669', bg: '#D1FAE5' };
+        case 'closed':
+            return { label: 'Closed', color: '#6B7280', bg: '#F3F4F6' };
+        default:
+            return { label: 'Open', color: '#059669', bg: '#D1FAE5' };
+    }
+};
+
 const formatTime = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
@@ -37,12 +50,10 @@ export default function ConversationList({ conversations, selectedId, onSelect }
         });
     }, [conversations]);
 
-    const open = conversations.filter((c) => c.status === 'open');
-    const closed = conversations.filter((c) => c.status === 'closed');
-
     const renderConversation = (conv) => {
         const last = lastMessages[conv.id];
         const isSelected = conv.id === selectedId;
+        const badge = getStatusBadge(conv.status);
 
         return (
             <div
@@ -54,23 +65,30 @@ export default function ConversationList({ conversations, selectedId, onSelect }
                 }}
                 onClick={() => onSelect(conv.id)}
             >
-                {/* Avatar */}
                 <div style={styles.avatar}>
                     {getInitials(conv.visitorName)}
                 </div>
 
-                {/* Info */}
                 <div style={styles.info}>
                     <div style={styles.topRow}>
                         <span style={styles.name}>{conv.visitorName || 'Visitor'}</span>
                         <span style={styles.time}>{formatTime(conv.lastMessageAt)}</span>
                     </div>
-                    <p style={styles.preview}>
-                        {last
-                            ? `${last.sender === 'visitor' ? '' : '↩ '}${last.text?.slice(0, 45)}${last.text?.length > 45 ? '...' : ''}`
-                            : 'No messages yet'
-                        }
-                    </p>
+                    <div style={styles.bottomRow}>
+                        <p style={styles.preview}>
+                            {last
+                                ? `${last.sender === 'visitor' ? '' : '↩ '}${last.text?.slice(0, 35)}${last.text?.length > 35 ? '...' : ''}`
+                                : 'No messages yet'
+                            }
+                        </p>
+                        <span style={{
+                            ...styles.badge,
+                            color: badge.color,
+                            backgroundColor: badge.bg,
+                        }}>
+                            {badge.label}
+                        </span>
+                    </div>
                 </div>
             </div>
         );
@@ -87,24 +105,13 @@ export default function ConversationList({ conversations, selectedId, onSelect }
 
     return (
         <div style={styles.container}>
-            {/* Open */}
-            {open.length > 0 && (
-                <>
-                    <div style={styles.sectionLabel}>
-                        OPEN · {open.length}
-                    </div>
-                    {open.map(renderConversation)}
-                </>
-            )}
-
-            {/* Closed */}
-            {closed.length > 0 && (
-                <>
-                    <div style={styles.sectionLabel}>
-                        CLOSED · {closed.length}
-                    </div>
-                    {closed.map(renderConversation)}
-                </>
+            {conversations.length === 0 ? (
+                <div style={styles.empty}>
+                    <p style={styles.emptyText}>No conversations yet.</p>
+                    <p style={styles.emptySub}>Visitors who open your widget will appear here.</p>
+                </div>
+            ) : (
+                conversations.map(renderConversation)
             )}
         </div>
     );
@@ -186,5 +193,21 @@ const styles = {
         fontSize: '13px',
         color: '#9CA3AF',
         margin: 0,
+    },
+
+    bottomRow: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+    },
+    badge: {
+        fontSize: '10px',
+        fontWeight: '700',
+        padding: '2px 6px',
+        borderRadius: '20px',
+        flexShrink: 0,
+        textTransform: 'uppercase',
+        letterSpacing: '0.03em',
     },
 };

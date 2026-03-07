@@ -21,9 +21,7 @@ firestore-debug.log
 *-firebase-adminsdk-*.json
 
 # ─── Build Outputs ───────────────────────────────
-dist/
 build/
-widget/dist/
 
 # ─── Vite / Dashboard ────────────────────────────
 dashboard/dist/

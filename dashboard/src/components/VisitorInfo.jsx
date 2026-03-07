@@ -31,6 +31,7 @@ export default function VisitorInfo({ conversation, installId, onClose }) {
     };
 
     const isClosed = conversation.status === 'closed';
+    const isWaiting = conversation.status === 'waiting';
 
     return (
         <div style={styles.container}>
@@ -43,10 +44,10 @@ export default function VisitorInfo({ conversation, installId, onClose }) {
                 <h3 style={styles.name}>{conversation.visitorName || 'Visitor'}</h3>
                 <span style={{
                     ...styles.statusBadge,
-                    backgroundColor: isClosed ? '#F3F4F6' : '#D1FAE5',
-                    color: isClosed ? '#6B7280' : '#059669',
+                    backgroundColor: isClosed ? '#F3F4F6' : isWaiting ? '#FEF3C7' : '#D1FAE5',
+                    color: isClosed ? '#6B7280' : isWaiting ? '#D97706' : '#059669',
                 }}>
-                    {isClosed ? 'Closed' : 'Open'}
+                    {isClosed ? 'Closed' : isWaiting ? 'Waiting' : 'Open'}
                 </span>
             </div>
 
@@ -95,7 +96,9 @@ export default function VisitorInfo({ conversation, installId, onClose }) {
 
                 <div style={styles.row}>
                     <span style={styles.rowLabel}>Status</span>
-                    <span style={styles.rowValue}>{isClosed ? 'Closed' : 'Open'}</span>
+                    <span style={styles.rowValue}>
+                        {isClosed ? 'Closed' : isWaiting ? 'Waiting' : 'Open'}
+                    </span>
                 </div>
             </div>
 

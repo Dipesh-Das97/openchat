@@ -1,4 +1,4 @@
-import { getDb, ref, push, onChildAdded, get, set, onValue } from './firebase.js';
+import { getDb, ref, push, onChildAdded, get, set, onValue, update } from './firebase.js';
 
 // Generate or retrieve visitor ID
 export const getVisitorId = () => {
@@ -39,16 +39,19 @@ export const getOrCreateConversation = async (installId, visitorName, visitorEma
 
 // Send a message
 export const sendMessage = async (conversationId, installId, text, sender = 'visitor') => {
-  const db = getDb();
-  await push(ref(db, `messages/${conversationId}`), {
-    sender,
-    text,
-    timestamp: Date.now(),
-    read: false,
-  });
+    const db = getDb();
+    await push(ref(db, `messages/${conversationId}`), {
+        sender,
+        text,
+        timestamp: Date.now(),
+        read: false,
+    });
 
-  // Update lastMessageAt
-  await set(ref(db, `conversations/${installId}/${conversationId}/lastMessageAt`), Date.now());
+    const updates = { lastMessageAt: Date.now() };
+    if (sender === 'visitor') updates.status = 'waiting';
+    else if (sender === 'agent') updates.status = 'open';
+
+    await update(ref(db, `conversations/${installId}/${conversationId}`), updates);
 };
 
 // Listen to new messages

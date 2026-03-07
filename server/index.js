@@ -5,6 +5,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const conversationRoutes = require('./routes/conversations');
 const agentRoutes = require('./routes/agent');
+const leadRoutes = require('./routes/leads');
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 // ─── Routes ──────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/leads', leadRoutes);
 
 // ─── Health Check ────────────────────────────
 app.get('/api/health', (req, res) => {

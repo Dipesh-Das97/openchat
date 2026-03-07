@@ -73,3 +73,18 @@ export const getAgentSettings = async (installId) => {
   const snap = await get(ref(db, `users/${installId}`));
   return snap.val();
 };
+
+export const saveLead = async (installId, leadData) => {
+    const db = getDb();
+
+    // Remove undefined values — Firebase rejects them
+    const cleanData = Object.fromEntries(
+        Object.entries(leadData).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+
+    await push(ref(db, `leads/${installId}`), {
+        ...cleanData,
+        timestamp: Date.now(),
+        visitorId: getVisitorId(),
+    });
+};

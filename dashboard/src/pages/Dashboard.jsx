@@ -9,6 +9,7 @@ import VisitorInfo from '../components/VisitorInfo';
 import StatusToggle from '../components/StatusToggle';
 import Settings from './Settings';
 import { useIsMobile } from '../hooks/useIsMobile';
+import Leads from './Leads';
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -144,6 +145,10 @@ export default function Dashboard() {
                         />
                     )}
 
+                    {view === 'leads' && (
+                        <Leads installId={installId} token={token} />
+                    )}
+
                 </div>
 
                 {/* Bottom Nav */}
@@ -157,6 +162,17 @@ export default function Dashboard() {
                     >
                         <span style={styles.bottomNavIcon}>🗨️</span>
                         <span style={styles.bottomNavLabel}>Chats</span>
+                    </button>
+
+                    <button
+                        style={{
+                            ...styles.bottomNavBtn,
+                            color: view === 'leads' ? '#4F46E5' : '#9CA3AF',
+                        }}
+                        onClick={() => setView('leads')}
+                    >
+                        <span style={styles.bottomNavIcon}>📋</span>
+                        <span style={styles.bottomNavLabel}>Leads</span>
                     </button>
 
                     <button
@@ -232,6 +248,19 @@ export default function Dashboard() {
                     <button
                         style={{
                             ...styles.navBtn,
+                            backgroundColor: view === 'leads' ? '#EEF2FF' : 'transparent',
+                            color: view === 'leads' ? '#4F46E5' : '#6B7280',
+                        }}
+                        onClick={() => setView('leads')}
+                        title="Leads"
+                    >
+                        <span style={styles.navIcon}>📋</span>
+                        <span style={styles.navLabel}>Leads</span>
+                    </button>
+
+                    <button
+                        style={{
+                            ...styles.navBtn,
                             backgroundColor: view === 'settings' ? '#EEF2FF' : 'transparent',
                             color: view === 'settings' ? '#4F46E5' : '#6B7280',
                         }}
@@ -260,6 +289,8 @@ export default function Dashboard() {
             {/* Main Content */}
             {view === 'settings' ? (
                 <Settings installId={installId} token={token} agent={agent} />
+            ) : view === 'leads' ? (
+                <Leads installId={installId} token={token} />
             ) : (
                 <>
                     <div style={styles.sidebar}>
@@ -528,67 +559,67 @@ const styles = {
         fontWeight: '600',
     },
     modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-    padding: '24px',
-},
-modal: {
-    backgroundColor: '#fff',
-    borderRadius: '16px',
-    padding: '32px 24px',
-    width: '100%',
-    maxWidth: '360px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-},
-modalIcon: {
-    fontSize: '40px',
-    marginBottom: '12px',
-},
-modalTitle: {
-    fontSize: '18px',
-    fontWeight: '700',
-    color: '#111827',
-    margin: '0 0 8px 0',
-},
-modalSub: {
-    fontSize: '14px',
-    color: '#6B7280',
-    margin: '0 0 24px 0',
-    textAlign: 'center',
-},
-modalButtons: {
-    display: 'flex',
-    gap: '12px',
-    width: '100%',
-},
-modalCancel: {
-    flex: 1,
-    padding: '10px',
-    backgroundColor: '#fff',
-    color: '#374151',
-    border: '1px solid #E5E7EB',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-},
-modalConfirm: {
-    flex: 1,
-    padding: '10px',
-    backgroundColor: '#EF4444',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-},
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '24px',
+    },
+    modal: {
+        backgroundColor: '#fff',
+        borderRadius: '16px',
+        padding: '32px 24px',
+        width: '100%',
+        maxWidth: '360px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+    },
+    modalIcon: {
+        fontSize: '40px',
+        marginBottom: '12px',
+    },
+    modalTitle: {
+        fontSize: '18px',
+        fontWeight: '700',
+        color: '#111827',
+        margin: '0 0 8px 0',
+    },
+    modalSub: {
+        fontSize: '14px',
+        color: '#6B7280',
+        margin: '0 0 24px 0',
+        textAlign: 'center',
+    },
+    modalButtons: {
+        display: 'flex',
+        gap: '12px',
+        width: '100%',
+    },
+    modalCancel: {
+        flex: 1,
+        padding: '10px',
+        backgroundColor: '#fff',
+        color: '#374151',
+        border: '1px solid #E5E7EB',
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+    },
+    modalConfirm: {
+        flex: 1,
+        padding: '10px',
+        backgroundColor: '#EF4444',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+    },
 };

@@ -17,6 +17,15 @@ export default function Settings({ installId, token, agent }) {
         company: agent?.profile?.company || '',
         website: agent?.profile?.website || '',
     });
+    const [serviceInput, setServiceInput] = useState('');
+    const [services, setServices] = useState(
+        agent?.leadFields?.services || []
+    );
+    const [serviceSelectionType, setServiceSelectionType] = useState(
+        agent?.leadFields?.serviceSelectionType || 'checklist'
+    );
+    const [savingServices, setSavingServices] = useState(false);
+    const [serviceSuccess, setServiceSuccess] = useState('');
 
     const embedCode = `<script>
   window.OpenChatConfig = { installId: "${installId}" }
@@ -50,6 +59,62 @@ export default function Settings({ installId, token, agent }) {
             setError('Something went wrong.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleAddService = () => {
+        const trimmed = serviceInput.trim();
+        if (!trimmed) return;
+        if (services.includes(trimmed)) return; // no duplicates
+        setServices([...services, trimmed]);
+        setServiceInput('');
+    };
+
+    const handleRemoveService = (index) => {
+        setServices(services.filter((_, i) => i !== index));
+    };
+
+    const handleSaveServices = async () => {
+        setSavingServices(true);
+        setServiceSuccess('');
+
+        try {
+            const res = await fetch('http://localhost:5000/api/agent/settings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    leadFields: {
+                        ...agent?.leadFields,
+                        services,
+                        serviceSelectionType,
+                    },
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error || 'Failed to save services');
+                return;
+            }
+
+            // Update local agent state
+            setAgent({
+                ...agent,
+                leadFields: {
+                    ...agent?.leadFields,
+                    services,
+                    serviceSelectionType,
+                },
+            });
+
+            setServiceSuccess('Services saved successfully!');
+        } catch (err) {
+            setError('Something went wrong.');
+        } finally {
+            setSavingServices(false);
         }
     };
 
@@ -187,6 +252,100 @@ export default function Settings({ installId, token, agent }) {
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
+
+                {/* ── Lead Gen Services ── */}
+                {agent?.mode === 'lead_gen' && (
+                    <div style={styles.section}>
+                        <h2 style={styles.sectionTitle}>Lead Gen Services</h2>
+                        <p style={styles.sectionSub}>
+                            Visitors will see these services in your lead capture form.
+                        </p>
+
+                        {/* Selection type toggle */}
+                        <div style={styles.field}>
+                            <label style={styles.label}>Selection Type</label>
+                            <div style={styles.radioRow}>
+                                {['checklist', 'dropdown'].map((type) => (
+                                    <div
+                                        key={type}
+                                        style={{
+                                            ...styles.radioCard,
+                                            borderColor: serviceSelectionType === type ? '#4F46E5' : '#E5E7EB',
+                                            backgroundColor: serviceSelectionType === type ? '#EEF2FF' : '#fff',
+                                            color: serviceSelectionType === type ? '#4F46E5' : '#6B7280',
+                                        }}
+                                        onClick={() => setServiceSelectionType(type)}
+                                    >
+                                        {type === 'checklist' ? '☑️ Checklist' : '📋 Dropdown'}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Add service input */}
+                        <div style={styles.field}>
+                            <label style={styles.label}>Add Service</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    style={styles.input}
+                                    type="text"
+                                    placeholder="e.g. Web Design"
+                                    value={serviceInput}
+                                    onChange={(e) => setServiceInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddService();
+                                    }}
+                                />
+                                <button
+                                    style={styles.addServiceBtn}
+                                    onClick={handleAddService}
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Service tags */}
+                        {services.length > 0 && (
+                            <div style={styles.tagsContainer}>
+                                {services.map((service, index) => (
+                                    <div key={index} style={styles.tag}>
+                                        <span style={styles.tagText}>{service}</span>
+                                        <button
+                                            style={styles.tagRemove}
+                                            onClick={() => handleRemoveService(index)}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {services.length === 0 && (
+                            <p style={styles.fieldHint}>No services added yet. Add some above!</p>
+                        )}
+
+                        <button
+                            style={{
+                                ...styles.saveBtn,
+                                width: isMobile ? '100%' : 'auto',
+                                marginTop: '16px',
+                                opacity: savingServices ? 0.7 : 1,
+                            }}
+                            onClick={handleSaveServices}
+                            disabled={savingServices}
+                        >
+                            {savingServices ? 'Saving...' : 'Save Services'}
+                        </button>
+
+                        {serviceSuccess && (
+                            <div style={{ ...styles.successMsg, marginTop: '12px' }}>
+                                {serviceSuccess}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ── Account Info ── */}
                 <div style={styles.section}>
@@ -370,5 +529,64 @@ const styles = {
         fontWeight: '600',
         color: '#111827',
         margin: 0,
+    },
+
+    radioRow: {
+        display: 'flex',
+        gap: '12px',
+        marginBottom: '4px',
+    },
+    radioCard: {
+        flex: 1,
+        padding: '10px',
+        border: '2px solid #E5E7EB',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        textAlign: 'center',
+        fontSize: '14px',
+        fontWeight: '600',
+        transition: 'all 0.15s',
+    },
+    addServiceBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#4F46E5',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        flexShrink: 0,
+    },
+    tagsContainer: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+        marginBottom: '8px',
+    },
+    tag: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        backgroundColor: '#EEF2FF',
+        border: '1px solid #C7D2FE',
+        borderRadius: '20px',
+        padding: '4px 10px 4px 12px',
+    },
+    tagText: {
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#4F46E5',
+    },
+    tagRemove: {
+        background: 'none',
+        border: 'none',
+        color: '#4F46E5',
+        cursor: 'pointer',
+        fontSize: '11px',
+        padding: '0',
+        display: 'flex',
+        alignItems: 'center',
+        opacity: 0.7,
     },
 };

@@ -1,5 +1,5 @@
 import { injectStyles } from './style.js';
-import { buildBubble, buildChatWindow, addMessage, updateStatus } from './ui.js';
+import { buildBubble, buildChatWindow, addMessage, updateStatus, buildLeadForm, showLeadSuccess, unlockChat } from './ui.js';
 import { initFirebase, getDb, ref, onValue } from './firebase.js';
 import {
     getOrCreateConversation,
@@ -7,6 +7,7 @@ import {
     listenMessages,
     getAgentPresence,
     getAgentSettings,
+    saveLead,
 } from './chat.js';
 
 const init = async () => {
@@ -85,26 +86,79 @@ const init = async () => {
         win.classList.toggle('oc-hidden');
 
         if (isHidden && !conversationId) {
-            const isReturning = !!localStorage.getItem(`oc_conversation_${installId}`);
+            const mode = settings.mode;
 
-            conversationId = await getOrCreateConversation(installId);
+            if (mode === 'lead_gen') {
+                const leadFields = settings.leadFields || {};
+                const alreadySubmitted = localStorage.getItem(`oc_lead_${installId}`);
 
-            if (!isReturning) {
-                // New visitor — send welcome message to Firebase
-                const welcome = welcomeMessage
-                    || settings?.welcomeMessage
-                    || 'Hi there! 👋 How can I help you today?';
-                await sendMessage(conversationId, installId, welcome, 'agent');
-            }
+                if (alreadySubmitted) {
+                    // Already submitted — unlock chat and restore session
+                    showLeadSuccess(JSON.parse(alreadySubmitted).name);
+                    unlockChat();
 
-            if (!listening) {
-                listening = true;
-                listenMessages(conversationId, (msg) => {
-                    addMessage(msg.text, msg.sender, msg.timestamp);
-                });
+                    // Restore conversation if exists
+                    conversationId = await getOrCreateConversation(installId);
+                    if (!listening) {
+                        listening = true;
+                        listenMessages(conversationId, (msg) => {
+                            addMessage(msg.text, msg.sender, msg.timestamp);
+                        });
+                        watchConversationStatus(conversationId);
+                    }
+                } else {
+                    // Show lead form
+                    buildLeadForm(
+                        { welcomeMessage: welcomeMessage || settings?.welcomeMessage },
+                        leadFields,
+                        async (leadData) => {
+                            // Save lead to Firebase
+                            await saveLead(installId, leadData);
 
-                // Now safe to watch status
-                watchConversationStatus(conversationId);
+                            // Save to localStorage
+                            localStorage.setItem(`oc_lead_${installId}`, JSON.stringify(leadData));
+
+                            // Show success + unlock chat
+                            showLeadSuccess(leadData.name);
+                            unlockChat();
+
+                            // Create conversation with visitor's name
+                            conversationId = await getOrCreateConversation(
+                                installId,
+                                leadData.name,
+                                leadData.email
+                            );
+
+                            // Start listening
+                            if (!listening) {
+                                listening = true;
+                                listenMessages(conversationId, (msg) => {
+                                    addMessage(msg.text, msg.sender, msg.timestamp);
+                                });
+                                watchConversationStatus(conversationId);
+                            }
+                        }
+                    );
+                }
+            } else {
+                // ── Chat App Mode (default) ──
+                const isReturning = !!localStorage.getItem(`oc_conversation_${installId}`);
+                conversationId = await getOrCreateConversation(installId);
+
+                if (!isReturning) {
+                    const welcome = welcomeMessage
+                        || settings?.welcomeMessage
+                        || 'Hi there! 👋 How can I help you today?';
+                    await sendMessage(conversationId, installId, welcome, 'agent');
+                }
+
+                if (!listening) {
+                    listening = true;
+                    listenMessages(conversationId, (msg) => {
+                        addMessage(msg.text, msg.sender, msg.timestamp);
+                    });
+                    watchConversationStatus(conversationId);
+                }
             }
         }
     });

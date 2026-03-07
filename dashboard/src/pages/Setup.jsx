@@ -274,37 +274,7 @@ export default function Setup() {
                         {/* ── CHAT BOT CONFIG ── */}
                         {selectedMode === 'chat_bot' && (
                             <>
-                                <div style={styles.sectionTitle}>AI Configuration</div>
-
-                                <div style={styles.field}>
-                                    <label style={styles.label}>AI Provider</label>
-                                    <div style={styles.radioRow}>
-                                        {['claude', 'openai'].map((p) => (
-                                            <div
-                                                key={p}
-                                                style={{
-                                                    ...styles.radioCard,
-                                                    borderColor: botConfig.provider === p ? '#4F46E5' : '#E5E7EB',
-                                                    backgroundColor: botConfig.provider === p ? '#EEF2FF' : '#fff',
-                                                }}
-                                                onClick={() => setBotConfig({ ...botConfig, provider: p })}
-                                            >
-                                                <span>{p === 'claude' ? '🟣 Claude' : '🟢 OpenAI'}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div style={styles.field}>
-                                    <label style={styles.label}>API Key</label>
-                                    <input
-                                        style={styles.input}
-                                        type="password"
-                                        placeholder={botConfig.provider === 'claude' ? 'sk-ant-...' : 'sk-...'}
-                                        value={botConfig.apiKey}
-                                        onChange={(e) => setBotConfig({ ...botConfig, apiKey: e.target.value })}
-                                    />
-                                </div>
+                                <div style={styles.sectionTitle}>Bot Configuration</div>
 
                                 <div style={styles.field}>
                                     <label style={styles.label}>Bot Name</label>

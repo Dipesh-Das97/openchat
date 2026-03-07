@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useAgentStore from '../store/agentStore';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { ref, onValue, push, remove } from 'firebase/database';
+import { db } from '../firebase';
 
 export default function Settings({ installId, token, agent }) {
     const setAgent = useAgentStore((state) => state.setAgent);
@@ -11,6 +13,12 @@ export default function Settings({ installId, token, agent }) {
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
+    const [kbQuestion, setKbQuestion] = useState('');
+    const [kbAnswer, setKbAnswer] = useState('');
+    const [kbEntries, setKbEntries] = useState([]);
+    const [savingKb, setSavingKb] = useState(false);
+    const [kbSuccess, setKbSuccess] = useState('');
+    const [kbLoaded, setKbLoaded] = useState(false);
 
     const [form, setForm] = useState({
         name: agent?.profile?.name || '',
@@ -26,6 +34,18 @@ export default function Settings({ installId, token, agent }) {
     );
     const [savingServices, setSavingServices] = useState(false);
     const [serviceSuccess, setServiceSuccess] = useState('');
+
+    useEffect(() => {
+        if (agent?.mode !== 'chat_bot' || !installId) return;
+        const kbRef = ref(db, `knowledgeBase/${installId}`);
+        const unsub = onValue(kbRef, (snap) => {
+            if (!snap.exists()) { setKbEntries([]); setKbLoaded(true); return; }
+            const entries = Object.entries(snap.val()).map(([id, val]) => ({ id, ...val }));
+            setKbEntries(entries);
+            setKbLoaded(true);
+        });
+        return () => unsub();
+    }, [agent?.mode, installId]);
 
     const embedCode = `<script>
   window.OpenChatConfig = { installId: "${installId}" }
@@ -115,6 +135,37 @@ export default function Settings({ installId, token, agent }) {
             setError('Something went wrong.');
         } finally {
             setSavingServices(false);
+        }
+    };
+
+    const handleAddKbEntry = async () => {
+        const q = kbQuestion.trim();
+        const a = kbAnswer.trim();
+        if (!q || !a) return;
+
+        setSavingKb(true);
+        try {
+            await push(ref(db, `knowledgeBase/${installId}`), {
+                question: q,
+                answer: a,
+                createdAt: Date.now(),
+            });
+            setKbQuestion('');
+            setKbAnswer('');
+            setKbSuccess('Entry added!');
+            setTimeout(() => setKbSuccess(''), 2000);
+        } catch (err) {
+            setError('Failed to add entry.');
+        } finally {
+            setSavingKb(false);
+        }
+    };
+
+    const handleRemoveKbEntry = async (id) => {
+        try {
+            await remove(ref(db, `knowledgeBase/${installId}/${id}`));
+        } catch (err) {
+            setError('Failed to remove entry.');
         }
     };
 
@@ -344,6 +395,85 @@ export default function Settings({ installId, token, agent }) {
                                 {serviceSuccess}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* ── Knowledge Base (Chat Bot mode only) ── */}
+                {agent?.mode === 'chat_bot' && (
+                    <div style={styles.section}>
+                        <h2 style={styles.sectionTitle}>Knowledge Base</h2>
+                        <p style={styles.sectionSub}>
+                            Add FAQs so the AI can answer visitor questions accurately.
+                        </p>
+
+                        {kbSuccess && (
+                            <div style={{ ...styles.successMsg, marginBottom: '16px' }}>
+                                {kbSuccess}
+                            </div>
+                        )}
+
+                        {/* Add entry form */}
+                        <div style={styles.field}>
+                            <label style={styles.label}>Question</label>
+                            <input
+                                style={styles.input}
+                                type="text"
+                                placeholder="e.g. What are your working hours?"
+                                value={kbQuestion}
+                                onChange={(e) => setKbQuestion(e.target.value)}
+                            />
+                        </div>
+
+                        <div style={styles.field}>
+                            <label style={styles.label}>Answer</label>
+                            <textarea
+                                style={{
+                                    ...styles.input,
+                                    minHeight: '80px',
+                                    resize: 'vertical',
+                                    fontFamily: 'Arial, sans-serif',
+                                }}
+                                placeholder="e.g. We're open Monday to Friday, 9am to 6pm IST."
+                                value={kbAnswer}
+                                onChange={(e) => setKbAnswer(e.target.value)}
+                            />
+                        </div>
+
+                        <button
+                            style={{
+                                ...styles.saveBtn,
+                                width: isMobile ? '100%' : 'auto',
+                                opacity: savingKb ? 0.7 : 1,
+                                marginBottom: '24px',
+                            }}
+                            onClick={handleAddKbEntry}
+                            disabled={savingKb}
+                        >
+                            {savingKb ? 'Adding...' : '+ Add Entry'}
+                        </button>
+
+                        {/* Existing entries */}
+                        {kbEntries.length === 0 && kbLoaded && (
+                            <p style={styles.fieldHint}>
+                                No entries yet. Add your first FAQ above!
+                            </p>
+                        )}
+
+                        {kbEntries.map((entry) => (
+                            <div key={entry.id} style={styles.kbEntry}>
+                                <div style={styles.kbEntryContent}>
+                                    <p style={styles.kbQuestion}>Q: {entry.question}</p>
+                                    <p style={styles.kbAnswer}>A: {entry.answer}</p>
+                                </div>
+                                <button
+                                    style={styles.kbRemoveBtn}
+                                    onClick={() => handleRemoveKbEntry(entry.id)}
+                                    title="Remove entry"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 )}
 
@@ -588,5 +718,39 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         opacity: 0.7,
+    },
+    kbEntry: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '12px',
+        backgroundColor: '#F9FAFB',
+        border: '1px solid #E5E7EB',
+        borderRadius: '8px',
+        padding: '12px 16px',
+        marginBottom: '10px',
+    },
+    kbEntryContent: {
+        flex: 1,
+    },
+    kbQuestion: {
+        fontSize: '13px',
+        fontWeight: '700',
+        color: '#111827',
+        margin: '0 0 4px 0',
+    },
+    kbAnswer: {
+        fontSize: '13px',
+        color: '#6B7280',
+        margin: 0,
+    },
+    kbRemoveBtn: {
+        background: 'none',
+        border: 'none',
+        color: '#9CA3AF',
+        cursor: 'pointer',
+        fontSize: '14px',
+        padding: '0',
+        flexShrink: 0,
+        lineHeight: 1,
     },
 };

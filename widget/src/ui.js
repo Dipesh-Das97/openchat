@@ -58,6 +58,7 @@ export const buildChatWindow = (config, isOnline) => {
 };
 
 export const addMessage = (text, sender, timestamp) => {
+  if (sender === 'system') return;
   const messages = document.getElementById('oc-messages');
   if (!messages) return;
 

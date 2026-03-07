@@ -42,34 +42,34 @@ export default function ChatPanel({ conversationId, installId, token }) {
     }, [messages]);
 
     const handleSend = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
+        const text = input.trim();
+        if (!text || loading) return;
 
-    setInput('');
-    setLoading(true);
+        setInput('');
+        setLoading(true);
 
-    try {
-        await push(ref(db, `messages/${conversationId}`), {
-            sender: 'agent',
-            text,
-            timestamp: Date.now(),
-            read: false,
-        });
+        try {
+            await push(ref(db, `messages/${conversationId}`), {
+                sender: 'agent',
+                text,
+                timestamp: Date.now(),
+                read: false,
+            });
 
-        // Update lastMessageAt + set status back to open
-        await update(
-            ref(db, `conversations/${installId}/${conversationId}`),
-            {
-                lastMessageAt: Date.now(),
-                status: 'open',
-            }
-        );
-    } catch (err) {
-        console.error('Failed to send message:', err);
-    } finally {
-        setLoading(false);
-    }
-};
+            // Update lastMessageAt + set status back to open
+            await update(
+                ref(db, `conversations/${installId}/${conversationId}`),
+                {
+                    lastMessageAt: Date.now(),
+                    status: 'open',
+                }
+            );
+        } catch (err) {
+            console.error('Failed to send message:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div style={styles.container}>
@@ -90,37 +90,57 @@ export default function ChatPanel({ conversationId, installId, token }) {
                 {messages.length === 0 && (
                     <div style={styles.noMessages}>No messages yet.</div>
                 )}
-                {messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        style={{
-                            ...styles.messageRow,
-                            justifyContent: msg.sender === 'agent' ? 'flex-end' : 'flex-start',
-                        }}
-                    >
-                        {msg.sender !== 'agent' && (
-                            <div style={styles.avatarSmall}>V</div>
-                        )}
-                        <div style={{
-                            ...styles.bubble,
-                            backgroundColor: msg.sender === 'agent' ? '#4F46E5' : '#fff',
-                            color: msg.sender === 'agent' ? '#fff' : '#111827',
-                            border: msg.sender === 'agent' ? 'none' : '1px solid #E5E7EB',
-                            borderBottomRightRadius: msg.sender === 'agent' ? '4px' : '12px',
-                            borderBottomLeftRadius: msg.sender !== 'agent' ? '4px' : '12px',
-                        }}>
-                            <p style={styles.bubbleText}>{msg.text}</p>
-                            <p style={styles.bubbleTime}>{formatTime(msg.timestamp)}</p>
-                        </div>
-                        {msg.sender === 'agent' && (
+                {messages.map((msg) => {
+                    // System message — centered banner
+                    if (msg.sender === 'system') {
+                        return (
+                            <div key={msg.id} style={styles.systemMessage}>
+                                🤖 {msg.text}
+                            </div>
+                        );
+                    }
+
+                    const isAgent = msg.sender === 'agent';
+                    const isAI = msg.sender === 'ai';
+                    const isVisitor = msg.sender === 'visitor';
+
+                    return (
+                        <div
+                            key={msg.id}
+                            style={{
+                                ...styles.messageRow,
+                                justifyContent: isVisitor ? 'flex-start' : 'flex-end',
+                            }}
+                        >
+                            {isVisitor && (
+                                <div style={styles.avatarSmall}>V</div>
+                            )}
                             <div style={{
-                                ...styles.avatarSmall,
-                                backgroundColor: '#4F46E5',
-                                color: '#fff',
-                            }}>A</div>
-                        )}
-                    </div>
-                ))}
+                                ...styles.bubble,
+                                backgroundColor: isVisitor ? '#fff' : isAI ? '#7C3AED' : '#4F46E5',
+                                color: isVisitor ? '#111827' : '#fff',
+                                border: isVisitor ? '1px solid #E5E7EB' : 'none',
+                                borderBottomRightRadius: !isVisitor ? '4px' : '12px',
+                                borderBottomLeftRadius: isVisitor ? '4px' : '12px',
+                            }}>
+                                {isAI && (
+                                    <span style={styles.aiBadge}>AI</span>
+                                )}
+                                <p style={styles.bubbleText}>{msg.text}</p>
+                                <p style={styles.bubbleTime}>{formatTime(msg.timestamp)}</p>
+                            </div>
+                            {!isVisitor && (
+                                <div style={{
+                                    ...styles.avatarSmall,
+                                    backgroundColor: isAI ? '#7C3AED' : '#4F46E5',
+                                    color: '#fff',
+                                }}>
+                                    {isAI ? '🤖' : 'A'}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
                 <div ref={bottomRef} />
             </div>
 
@@ -263,5 +283,26 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
+    },
+    systemMessage: {
+        textAlign: 'center',
+        fontSize: '12px',
+        color: '#6B7280',
+        backgroundColor: '#F3F4F6',
+        borderRadius: '20px',
+        padding: '4px 12px',
+        margin: '4px auto',
+        maxWidth: '80%',
+    },
+    aiBadge: {
+        display: 'inline-block',
+        fontSize: '10px',
+        fontWeight: '700',
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        color: '#fff',
+        borderRadius: '4px',
+        padding: '1px 5px',
+        marginRight: '6px',
+        verticalAlign: 'middle',
     },
 };

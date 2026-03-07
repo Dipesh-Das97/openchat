@@ -78,8 +78,14 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+    const firebaseToken = await admin.auth().createCustomToken(userRecord.uid);
 
-    res.json({ token, installId });
+    res.json({
+      token,        // your JWT
+      firebaseToken, // Firebase custom token
+      installId,
+      name: userRecord.displayName,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -99,6 +105,16 @@ router.post('/resend-verification', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/auth/firebase-token
+router.get('/firebase-token', verifyAgent, async (req, res) => {
+  try {
+    const firebaseToken = await admin.auth().createCustomToken(req.agent.installId);
+    res.json({ firebaseToken });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create Firebase token' });
   }
 });
 

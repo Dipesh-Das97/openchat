@@ -33,7 +33,8 @@ export default function Login() {
         return;
       }
 
-      setAuth(data.token, data.installId);
+      // Set auth with firebaseToken from login response
+      await setAuth(data.token, data.installId, data.firebaseToken);
 
       // Fetch agent profile
       const profileRes = await fetch('http://localhost:5000/api/auth/me', {

@@ -20,7 +20,6 @@ export default function Register() {
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [passwordError, setPasswordError] = useState('');
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -140,13 +139,30 @@ export default function Register() {
                 <div style={styles.field}>
                     <label style={styles.label}>Confirm Password</label>
                     <input
-                        style={styles.input}
+                        style={{
+                            ...styles.input,
+                            borderColor: form.confirmPassword
+                                ? form.password === form.confirmPassword
+                                    ? '#059669'
+                                    : '#DC2626'
+                                : '#D1D5DB',
+                        }}
                         type="password"
                         name="confirmPassword"
                         placeholder="••••••••"
                         value={form.confirmPassword || ''}
                         onChange={handleChange}
                     />
+                    {/* Live feedback */}
+                    {form.confirmPassword && (
+                        <p style={{
+                            fontSize: '12px',
+                            marginTop: '4px',
+                            color: form.password === form.confirmPassword ? '#059669' : '#DC2626',
+                        }}>
+                            {form.password === form.confirmPassword ? '✅ Passwords match' : '❌ Passwords do not match'}
+                        </p>
+                    )}
                 </div>
 
                 {/* Business Toggle */}

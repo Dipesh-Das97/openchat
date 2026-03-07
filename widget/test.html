@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenChat Widget Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 80px auto;
+      padding: 24px;
+      color: #111827;
+    }
+    h1 { color: #4F46E5; }
+    p { color: #6B7280; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h1>Test Page 🧪</h1>
+  <p>This is a fake website to test the OpenChat widget.</p>
+  <p>You should see a chat bubble in the bottom right corner.</p>
+  <p>Click it to open the chat window.</p>
+
+  <!-- OpenChat Widget -->
+  <script>
+    window.OpenChatConfig = {
+      installId: "P7DQ1TKYuidNmCE7F0zK5UVxNV52",
+      primaryColor: "#4F46E5",
+      position: "bottom-right",
+      companyName: "Test Company",
+      welcomeMessage: "Hi there! 👋 How can I help?"
+    }
+  </script>
+  <script src="./dist/widget.js"></script>
+</body>
+</html>

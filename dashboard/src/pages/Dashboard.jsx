@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAgentStore from '../store/agentStore';
 import { db } from '../firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, get } from 'firebase/database';
 import ConversationList from '../components/ConversationList';
 import ChatPanel from '../components/ChatWindow';
 import VisitorInfo from '../components/VisitorInfo';
@@ -59,25 +59,30 @@ export default function Dashboard() {
                 .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
 
             // Check for new messages vs previous state
-            list.forEach((conv) => {
+            list.forEach(async (conv) => {
                 const prev = prevConversationsRef.current[conv.id];
-                if (
-                    prev &&
-                    conv.lastMessageAt > prev.lastMessageAt &&
-                    conv.id !== selectedId
-                ) {
-                    notify(
-                        `New message from ${conv.visitorName || 'Visitor'}`,
-                        'Click to open the conversation',
-                        () => {
-                            setSelectedId(conv.id);
-                            setView('conversations');
-                        }
-                    );
+                if (prev && conv.lastMessageAt > prev.lastMessageAt) {
+                    // Check who sent the last message
+                    const msgSnap = await get(ref(db, `messages/${conv.id}`));
+                    if (!msgSnap.exists()) return;
+
+                    const msgs = Object.values(msgSnap.val());
+                    const lastMsg = msgs[msgs.length - 1];
+
+                    // Only notify if last message is from visitor
+                    if (lastMsg?.sender === 'visitor') {
+                        notify(
+                            `New message from ${conv.visitorName || 'Visitor'}`,
+                            lastMsg.text?.slice(0, 60) || 'New message',
+                            () => {
+                                setSelectedId(conv.id);
+                                setView('conversations');
+                            }
+                        );
+                    }
                 }
             });
-
-            // Update ref
+            // Update ref AFTER checking
             prevConversationsRef.current = Object.fromEntries(
                 list.map((c) => [c.id, c])
             );
@@ -86,20 +91,6 @@ export default function Dashboard() {
         });
         return () => unsub();
     }, [installId, selectedId]);
-
-    useEffect(() => {
-        if (!installId) return;
-        const convRef = ref(db, `conversations/${installId}`);
-        const unsub = onValue(convRef, (snap) => {
-            if (!snap.exists()) { setConversations([]); return; }
-            const data = snap.val();
-            const list = Object.entries(data)
-                .map(([id, val]) => ({ id, ...val }))
-                .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
-            setConversations(list);
-        });
-        return () => unsub();
-    }, [installId]);
 
     useEffect(() => {
         if (!installId) return;
@@ -155,6 +146,7 @@ export default function Dashboard() {
                         </div>
                     )}
 
+
                     {/* Chat view */}
                     {view === 'chat' && selectedId && (
                         <div style={styles.mobilePage}>
@@ -178,6 +170,7 @@ export default function Dashboard() {
                                 installId={installId}
                                 token={token}
                             />
+
                         </div>
                     )}
 
@@ -346,6 +339,7 @@ export default function Dashboard() {
                                 isOnline={isOnline}
                                 setIsOnline={setIsOnline}
                             />
+
                         </div>
                         <ConversationList
                             conversations={conversations}

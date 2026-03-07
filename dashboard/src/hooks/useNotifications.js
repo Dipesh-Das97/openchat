@@ -12,6 +12,27 @@ export const useNotifications = () => {
         }
     };
 
+    const playSound = () => {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+
+            oscillator.frequency.value = 880;
+            oscillator.type = 'sine';
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + 0.4);
+        } catch (err) {
+            console.warn('Audio notification failed:', err);
+        }
+    };
+
     // Reset unread count when tab is focused
     useEffect(() => {
         const handleFocus = () => {
@@ -23,11 +44,14 @@ export const useNotifications = () => {
     }, []);
 
     const notify = (title, body, onClick) => {
-        // Increment unread count
+        // Always increment tab badge
         unreadRef.current += 1;
         document.title = `(${unreadRef.current}) ${originalTitle}`;
 
-        // Browser notification — only when tab not focused
+        // Always play sound
+        playSound();
+
+        // Browser popup only when tab not focused
         if (permissionRef.current === 'granted' && document.visibilityState !== 'visible') {
             const notification = new Notification(title, {
                 body,

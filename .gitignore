@@ -62,3 +62,5 @@ coverage/
 server/serviceAccount.json
 
 
+# --- Dashboard ------
+dashboard/.env

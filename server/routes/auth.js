@@ -7,7 +7,7 @@ const { sendVerificationEmail } = require('../services/emailService');
 
 // ─── Register ─────────────────────────────────
 router.post('/register', async (req, res) => {
-  const { name, email, password, company, website } = req.body;
+  const { name, email, password, company, website, type } = req.body;
 
   try {
     const userRecord = await admin.auth().createUser({ email, password });
@@ -20,7 +20,7 @@ router.post('/register', async (req, res) => {
     await sendVerificationEmail(email, verificationLink, name);
 
     await db.ref(`users/${installId}`).set({
-      profile: { name, email, company, website },
+      profile: { name, email, company, website, type },
       mode: null,
       onboardingComplete: false,
       emailVerified: false,
@@ -33,8 +33,8 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.status(201).json({ 
-      token, 
+    res.status(201).json({
+      token,
       installId,
       message: 'Registration successful. Please check your email to verify your account.'
       // verificationLink removed from response now
@@ -67,8 +67,8 @@ router.post('/login', async (req, res) => {
     // Check if email is verified
     const userRecord = await admin.auth().getUser(data.localId);
     if (!userRecord.emailVerified) {
-      return res.status(403).json({ 
-        error: 'Email not verified. Please check your inbox and verify your email first.' 
+      return res.status(403).json({
+        error: 'Email not verified. Please check your inbox and verify your email first.'
       });
     }
 
@@ -90,10 +90,10 @@ router.post('/resend-verification', async (req, res) => {
 
   try {
     const verificationLink = await admin.auth().generateEmailVerificationLink(email);
-    
+
     // In production you'd send this via SendGrid/Nodemailer
     // For now we return it for testing
-    res.json({ 
+    res.json({
       message: 'Verification email sent.',
       verificationLink // remove in production
     });

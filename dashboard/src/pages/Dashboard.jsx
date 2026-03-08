@@ -21,114 +21,218 @@ function getGreeting() {
     return 'Good evening';
 }
 
+// ── Mini bar chart ─────────────────────────────────────────
+function MiniBarChart({ data, color }) {
+    const max = Math.max(...data.map((d) => d.value), 1);
+    return (
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '60px' }}>
+            {data.map((d, i) => (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <div
+                        style={{
+                            width: '100%',
+                            height: `${Math.max((d.value / max) * 52, d.value > 0 ? 4 : 0)}px`,
+                            backgroundColor: d.value > 0 ? color : '#F3F4F6',
+                            borderRadius: '3px 3px 0 0',
+                            transition: 'height 0.3s ease',
+                            position: 'relative',
+                        }}
+                        title={`${d.label}: ${d.value}`}
+                    />
+                    <span style={{ fontSize: '9px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{d.label}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 // ── Home Page ──────────────────────────────────────────────
 function HomePage({ agent, isOnline, setIsOnline, installId, conversations, setView }) {
     const agentName = agent?.profile?.name || agent?.name || 'Agent';
-    const totalLeads = agent?.leads?.length || 0;
-    const features = agent?.features || {};
+    const isMobile = useIsMobile();
 
-    const activeFeatureCount = [features.leadForm, features.aiReply, features.workingHours]
-        .filter(Boolean).length;
+    const [range, setRange] = useState('7');
+    const [leads, setLeads] = useState([]);
+    const [loadingLeads, setLoadingLeads] = useState(true);
+
+    // Load leads from Firebase
+    useEffect(() => {
+        if (!installId) return;
+        const leadsRef = ref(db, `leads/${installId}`);
+        const unsub = onValue(leadsRef, (snap) => {
+            if (!snap.exists()) { setLeads([]); setLoadingLeads(false); return; }
+            const data = Object.entries(snap.val()).map(([id, v]) => ({ id, ...v }));
+            setLeads(data);
+            setLoadingLeads(false);
+        });
+        return () => unsub();
+    }, [installId]);
+
+    const days = parseInt(range);
+
+    // Build date labels for last N days
+    const buildDayLabels = (n) => {
+        const labels = [];
+        for (let i = n - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            labels.push({
+                label: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+                dateStr: d.toISOString().split('T')[0],
+            });
+        }
+        return labels;
+    };
+
+    const dayLabels = buildDayLabels(days);
+
+    // Conversations per day
+    const convChartData = dayLabels.map(({ label, dateStr }) => ({
+        label: days === 7 ? label.split(' ')[1] : label.split(' ')[1], // just day number
+        value: conversations.filter((c) => {
+            const d = new Date(c.createdAt).toISOString().split('T')[0];
+            return d === dateStr;
+        }).length,
+    }));
+
+    // Leads per day
+    const leadChartData = dayLabels.map(({ label, dateStr }) => ({
+        label: label.split(' ')[1],
+        value: leads.filter((l) => {
+            const d = new Date(l.timestamp).toISOString().split('T')[0];
+            return d === dateStr;
+        }).length,
+    }));
+
+    // Stat cards
+    const openChats = conversations.filter((c) => c.status === 'open' || c.status === 'waiting').length;
+    const convertedLeads = leads.filter((l) => l.status === 'converted').length;
 
     const statCards = [
-        {
-            icon: '💬',
-            label: 'Total Chats',
-            value: conversations.length,
-            onClick: () => setView('conversations'),
-        },
-        {
-            icon: '📋',
-            label: 'Total Leads',
-            value: totalLeads,
-            onClick: () => setView('leads'),
-        },
-        {
-            icon: '⚡',
-            label: 'Active Features',
-            value: `${activeFeatureCount} / 3`,
-            onClick: () => setView('settings'),
-        },
+        { icon: '💬', label: 'Total Chats', value: conversations.length, onClick: () => setView('conversations'), color: '#4F46E5' },
+        { icon: '🟢', label: 'Open Chats', value: openChats, onClick: () => setView('conversations'), color: '#059669' },
+        { icon: '📋', label: 'Total Leads', value: leads.length, onClick: () => setView('leads'), color: '#7C3AED' },
+        { icon: '✅', label: 'Converted', value: convertedLeads, onClick: () => setView('leads'), color: '#D97706' },
     ];
 
-    const quickActions = [
-        { label: '💬 Open Chats', view: 'conversations' },
-        { label: '📋 View Leads', view: 'leads' },
-        { label: '⚙️ Settings', view: 'settings' },
-    ];
-
-    const featureBadges = [
-        { label: 'Lead Form', active: !!features.leadForm },
-        { label: 'AI Reply', active: !!features.aiReply },
-        { label: 'Working Hours', active: !!features.workingHours },
-    ];
+    // Leads by service
+    const serviceCounts = {};
+    leads.forEach((l) => {
+        if (!l.services) return;
+        l.services.split(',').forEach((s) => {
+            const key = s.trim();
+            if (key) serviceCounts[key] = (serviceCounts[key] || 0) + 1;
+        });
+    });
+    const serviceEntries = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]);
+    const maxServiceCount = Math.max(...serviceEntries.map(([, v]) => v), 1);
 
     return (
         <div style={homeStyles.container}>
+
             {/* Header */}
             <div style={homeStyles.header}>
                 <div>
                     <h1 style={homeStyles.greeting}>{getGreeting()}, {agentName}! 👋</h1>
                     <p style={homeStyles.subGreeting}>Here's your overview</p>
                 </div>
-                <StatusToggle
-                    installId={installId}
-                    isOnline={isOnline}
-                    setIsOnline={setIsOnline}
-                />
+                <StatusToggle installId={installId} isOnline={isOnline} setIsOnline={setIsOnline} />
             </div>
 
             {/* Stat Cards */}
-            <div style={homeStyles.statsRow}>
+            <div style={{ ...homeStyles.statsRow, gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)' }}>
                 {statCards.map((card) => (
-                    <div
-                        key={card.label}
-                        style={homeStyles.statCard}
-                        onClick={card.onClick}
-                    >
-                        <span style={homeStyles.statIcon}>{card.icon}</span>
-                        <p style={homeStyles.statValue}>{card.value}</p>
+                    <div key={card.label} style={homeStyles.statCard} onClick={card.onClick}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '20px' }}>{card.icon}</span>
+                            <span style={{ ...homeStyles.statValue, color: card.color }}>{card.value}</span>
+                        </div>
                         <p style={homeStyles.statLabel}>{card.label}</p>
                     </div>
                 ))}
             </div>
 
+            {/* Range Toggle */}
+            <div style={homeStyles.rangeRow}>
+                <span style={homeStyles.rangeLabel}>Showing last</span>
+                {['7', '30'].map((r) => (
+                    <button
+                        key={r}
+                        style={{
+                            ...homeStyles.rangeBtn,
+                            backgroundColor: range === r ? '#4F46E5' : '#fff',
+                            color: range === r ? '#fff' : '#6B7280',
+                            border: `1px solid ${range === r ? '#4F46E5' : '#E5E7EB'}`,
+                        }}
+                        onClick={() => setRange(r)}
+                    >
+                        {r} days
+                    </button>
+                ))}
+            </div>
+
+            {/* Charts row */}
+            <div style={{ ...homeStyles.chartsRow, flexDirection: isMobile ? 'column' : 'row' }}>
+
+                {/* Conversation trend */}
+                <div style={homeStyles.card}>
+                    <p style={homeStyles.cardTitle}>💬 Conversations</p>
+                    <MiniBarChart data={convChartData} color="#4F46E5" />
+                </div>
+
+                {/* Lead trend */}
+                <div style={homeStyles.card}>
+                    <p style={homeStyles.cardTitle}>📋 Leads</p>
+                    <MiniBarChart data={leadChartData} color="#7C3AED" />
+                </div>
+
+            </div>
+
+            {/* Leads by service */}
+            <div style={homeStyles.card}>
+                <p style={homeStyles.cardTitle}>🛠️ Leads by Service</p>
+                {serviceEntries.length === 0 ? (
+                    <p style={homeStyles.emptyText}>No service data yet.</p>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {serviceEntries.map(([service, count]) => (
+                            <div key={service}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '13px', color: '#374151', fontWeight: '500' }}>{service}</span>
+                                    <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '600' }}>{count}</span>
+                                </div>
+                                <div style={{ height: '6px', backgroundColor: '#F3F4F6', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${(count / maxServiceCount) * 100}%`,
+                                        backgroundColor: '#7C3AED',
+                                        borderRadius: '3px',
+                                        transition: 'width 0.4s ease',
+                                    }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             {/* Quick Actions */}
-            <div style={homeStyles.section}>
-                <p style={homeStyles.sectionTitle}>⚡ Quick Actions</p>
-                <div style={homeStyles.actionsRow}>
-                    {quickActions.map((action) => (
-                        <button
-                            key={action.view}
-                            style={homeStyles.actionBtn}
-                            onClick={() => setView(action.view)}
-                        >
+            <div style={homeStyles.card}>
+                <p style={homeStyles.cardTitle}>⚡ Quick Actions</p>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {[
+                        { label: '💬 Open Chats', view: 'conversations' },
+                        { label: '📋 View Leads', view: 'leads' },
+                        { label: '📦 Embed Widget', view: 'docs' },
+                        { label: '⚙️ Settings', view: 'settings' },
+                    ].map((action) => (
+                        <button key={action.view} style={homeStyles.actionBtn} onClick={() => setView(action.view)}>
                             {action.label}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* Features Active */}
-            <div style={homeStyles.section}>
-                <p style={homeStyles.sectionTitle}>📦 Features</p>
-                <div style={homeStyles.featuresRow}>
-                    {featureBadges.map((f) => (
-                        <div
-                            key={f.label}
-                            style={{
-                                ...homeStyles.featureBadge,
-                                backgroundColor: f.active ? '#D1FAE5' : '#F3F4F6',
-                                color: f.active ? '#059669' : '#9CA3AF',
-                                border: `1px solid ${f.active ? '#A7F3D0' : '#E5E7EB'}`,
-                            }}
-                        >
-                            <span>{f.active ? '✅' : '❌'}</span>
-                            <span style={homeStyles.featureBadgeLabel}>{f.label}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
         </div>
     );
 }
@@ -137,14 +241,16 @@ const homeStyles = {
     container: {
         flex: 1,
         overflowY: 'auto',
-        padding: '32px',
+        padding: '24px',
         backgroundColor: '#F9FAFB',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
     },
     header: {
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
-        marginBottom: '28px',
         gap: '16px',
         flexWrap: 'wrap',
     },
@@ -160,57 +266,73 @@ const homeStyles = {
         margin: 0,
     },
     statsRow: {
-        display: 'flex',
-        gap: '16px',
-        marginBottom: '28px',
-        flexWrap: 'wrap',
+        display: 'grid',
+        gap: '12px',
     },
     statCard: {
-        flex: '1 1 120px',
         backgroundColor: '#fff',
         border: '1px solid #E5E7EB',
         borderRadius: '12px',
-        padding: '20px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '6px',
+        padding: '16px',
         cursor: 'pointer',
         transition: 'box-shadow 0.15s',
-        minWidth: '100px',
+        display: 'flex',
+        flexDirection: 'column',
     },
-    statIcon: { fontSize: '24px' },
     statValue: {
-        fontSize: '24px',
+        fontSize: '22px',
         fontWeight: '700',
-        color: '#111827',
         margin: 0,
     },
     statLabel: {
         fontSize: '12px',
         color: '#6B7280',
         margin: 0,
-        textAlign: 'center',
+        fontWeight: '500',
     },
-    section: {
+    rangeRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+    },
+    rangeLabel: {
+        fontSize: '13px',
+        color: '#6B7280',
+        marginRight: '4px',
+    },
+    rangeBtn: {
+        padding: '5px 12px',
+        borderRadius: '20px',
+        fontSize: '12px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+    },
+    chartsRow: {
+        display: 'flex',
+        gap: '16px',
+    },
+    card: {
+        flex: 1,
         backgroundColor: '#fff',
         border: '1px solid #E5E7EB',
         borderRadius: '12px',
         padding: '20px',
-        marginBottom: '16px',
     },
-    sectionTitle: {
+    cardTitle: {
         fontSize: '13px',
         fontWeight: '700',
         color: '#374151',
-        margin: '0 0 14px 0',
+        margin: '0 0 16px 0',
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
     },
-    actionsRow: {
-        display: 'flex',
-        gap: '10px',
-        flexWrap: 'wrap',
+    emptyText: {
+        fontSize: '13px',
+        color: '#9CA3AF',
+        margin: 0,
+        textAlign: 'center',
+        padding: '20px 0',
     },
     actionBtn: {
         padding: '10px 18px',
@@ -222,24 +344,6 @@ const homeStyles = {
         fontWeight: '600',
         cursor: 'pointer',
         minHeight: '40px',
-        transition: 'background-color 0.15s',
-    },
-    featuresRow: {
-        display: 'flex',
-        gap: '10px',
-        flexWrap: 'wrap',
-    },
-    featureBadge: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '8px 14px',
-        borderRadius: '20px',
-        fontSize: '13px',
-        fontWeight: '600',
-    },
-    featureBadgeLabel: {
-        fontSize: '13px',
     },
 };
 

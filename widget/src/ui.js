@@ -3,7 +3,6 @@ export const buildBubble = (config) => {
   bubble.id = 'openchat-bubble';
   bubble.innerHTML = '💬';
 
-  // Apply custom position
   if (config.position === 'bottom-left') {
     bubble.style.right = 'auto';
     bubble.style.left = '24px';
@@ -106,35 +105,8 @@ export const updateStatus = (isOnline) => {
   `;
 };
 
-export const buildLeadForm = (config, leadFields, onSubmit) => {
-    const messages = document.getElementById('oc-messages');
-    const input = document.getElementById('oc-input');
-    const sendBtn = document.getElementById('oc-send');
-    if (!messages) return;
-
-    // Disable input until form submitted
-    if (input) {
-        input.disabled = true;
-        input.placeholder = 'Fill in the form above to start chatting...';
-        input.style.backgroundColor = '#F3F4F6';
-        input.style.color = '#9CA3AF';
-        input.style.cursor = 'not-allowed';
-    }
-    if (sendBtn) {
-        sendBtn.disabled = true;
-        sendBtn.style.opacity = '0.4';
-    }
-
-    // Welcome message
-    const welcome = document.createElement('div');
-    welcome.classList.add('oc-message', 'agent');
-    welcome.innerHTML = `
-        ${config.welcomeMessage || 'Hi there! 👋 Please fill in your details below.'}
-        <div class="oc-message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-    `;
-    messages.appendChild(welcome);
-
-    // Country codes
+// ── Shared form fields builder ──
+const buildFormFields = (leadFields) => {
     const countryCodes = [
         { code: '+91', flag: '🇮🇳', name: 'India' },
         { code: '+1', flag: '🇺🇸', name: 'USA/Canada' },
@@ -163,271 +135,182 @@ export const buildLeadForm = (config, leadFields, onSubmit) => {
 
     let fieldsHTML = '';
 
-    // Name field
     if (leadFields?.name !== false) {
-        fieldsHTML += `
-            <input
-                class="oc-collect-input"
-                type="text"
-                id="oc-field-name"
-                placeholder="Your full name *"
-            />
-        `;
+        fieldsHTML += `<input class="oc-collect-input" type="text" id="oc-field-name" placeholder="Your full name *" />`;
     }
 
-    // Contact error (shown if neither email nor phone filled)
     if (needsContact) {
         fieldsHTML += `
-            <div id="oc-contact-error" style="
-                display:none;
-                color:#DC2626;
-                font-size:12px;
-                padding:6px 10px;
-                background:#FEE2E2;
-                border-radius:6px;
-            ">
+            <div id="oc-contact-error" style="display:none;color:#DC2626;font-size:12px;padding:6px 10px;background:#FEE2E2;border-radius:6px;">
                 Please provide at least your email or phone number.
             </div>
         `;
     }
 
-    // Email field
     if (leadFields?.email) {
-        fieldsHTML += `
-            <input
-                class="oc-collect-input"
-                type="email"
-                id="oc-field-email"
-                placeholder="Email address"
-            />
-        `;
+        fieldsHTML += `<input class="oc-collect-input" type="email" id="oc-field-email" placeholder="Email address" />`;
     }
 
-    // Phone field with country code
     if (leadFields?.phone) {
         fieldsHTML += `
             <div style="display:flex;gap:6px;align-items:center;">
-                <select
-                    id="oc-field-country"
-                    style="
-                        padding:10px 6px;
-                        border-radius:8px;
-                        border:1px solid #D1D5DB;
-                        font-size:13px;
-                        outline:none;
-                        background:#fff;
-                        color:#111827;
-                        cursor:pointer;
-                        flex-shrink:0;
-                        max-width:110px;
-                    "
-                >
+                <select id="oc-field-country" style="padding:10px 6px;border-radius:8px;border:1px solid #D1D5DB;font-size:13px;outline:none;background:#fff;color:#111827;cursor:pointer;flex-shrink:0;max-width:110px;">
                     ${countryOptions}
                 </select>
-                <input
-                    class="oc-collect-input"
-                    type="tel"
-                    id="oc-field-phone"
-                    placeholder="Phone number"
-                    style="flex:1;margin:0;"
-                />
+                <input class="oc-collect-input" type="tel" id="oc-field-phone" placeholder="Phone number" style="flex:1;margin:0;" />
             </div>
         `;
     }
 
-    // Company field
     if (leadFields?.company) {
-        fieldsHTML += `
-            <input
-                class="oc-collect-input"
-                type="text"
-                id="oc-field-company"
-                placeholder="Company name"
-            />
-        `;
+        fieldsHTML += `<input class="oc-collect-input" type="text" id="oc-field-company" placeholder="Company name" />`;
     }
 
-    // Custom question — only show as input if NO services list
     if (leadFields?.customEnabled && leadFields?.customQuestion && !hasServices) {
-        fieldsHTML += `
-            <input
-                class="oc-collect-input"
-                type="text"
-                id="oc-field-custom"
-                placeholder="${leadFields.customQuestion}"
-            />
-        `;
+        fieldsHTML += `<input class="oc-collect-input" type="text" id="oc-field-custom" placeholder="${leadFields.customQuestion}" />`;
     }
 
-    // Services — checklist or dropdown
     if (hasServices) {
-        // Use custom question as title if available, else default
         const sectionLabel = leadFields?.customEnabled && leadFields?.customQuestion
             ? leadFields.customQuestion
             : 'Interested in:';
 
-        const label = `
-            <p style="font-size:13px;font-weight:600;color:#374151;margin:4px 0 8px 0;">
-                ${sectionLabel}
-            </p>
-        `;
+        const label = `<p style="font-size:13px;font-weight:600;color:#374151;margin:4px 0 8px 0;">${sectionLabel}</p>`;
 
         if (leadFields.serviceSelectionType === 'dropdown') {
-            const options = leadFields.services
-                .map((s) => `<option value="${s}">${s}</option>`)
-                .join('');
+            const options = leadFields.services.map((s) => `<option value="${s}">${s}</option>`).join('');
             fieldsHTML += `
                 ${label}
-                <select
-                    id="oc-field-services"
-                    class="oc-collect-input"
-                    style="cursor:pointer;"
-                >
+                <select id="oc-field-services" class="oc-collect-input" style="cursor:pointer;">
                     <option value="">Select a service...</option>
                     ${options}
                 </select>
             `;
         } else {
-            // Checklist
             const checkboxes = leadFields.services.map((s, i) => `
-                <label style="
-                    display:flex;
-                    align-items:center;
-                    gap:8px;
-                    font-size:13px;
-                    color:#374151;
-                    cursor:pointer;
-                    padding:4px 0;
-                ">
-                    <input
-                        type="checkbox"
-                        id="oc-service-${i}"
-                        value="${s}"
-                        style="
-                            width:16px;
-                            height:16px;
-                            accent-color:#4F46E5;
-                            cursor:pointer;
-                            flex-shrink:0;
-                        "
-                    />
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;padding:4px 0;">
+                    <input type="checkbox" id="oc-service-${i}" value="${s}" style="width:16px;height:16px;accent-color:#4F46E5;cursor:pointer;flex-shrink:0;" />
                     ${s}
                 </label>
             `).join('');
 
             fieldsHTML += `
                 ${label}
-                <div style="
-                    background:#F9FAFB;
-                    border:1px solid #E5E7EB;
-                    border-radius:8px;
-                    padding:10px 14px;
-                    display:flex;
-                    flex-direction:column;
-                ">
+                <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;">
                     ${checkboxes}
                 </div>
             `;
         }
     }
 
-    // Build form
+    return { fieldsHTML, needsContact, hasServices };
+};
+
+// ── Shared form submit handler ──
+const handleFormSubmit = async (leadFields, hasServices, needsContact, onSubmit) => {
+    const name = document.getElementById('oc-field-name')?.value?.trim();
+    const email = document.getElementById('oc-field-email')?.value?.trim();
+    const countryCode = document.getElementById('oc-field-country')?.value || '';
+    const phoneRaw = document.getElementById('oc-field-phone')?.value?.trim();
+    const phone = phoneRaw ? `${countryCode} ${phoneRaw}` : '';
+    const company = document.getElementById('oc-field-company')?.value?.trim();
+    const custom = document.getElementById('oc-field-custom')?.value?.trim();
+
+    let services;
+    if (hasServices) {
+        if (leadFields.serviceSelectionType === 'dropdown') {
+            services = document.getElementById('oc-field-services')?.value || '';
+        } else {
+            const selected = leadFields.services
+                .filter((_, i) => document.getElementById(`oc-service-${i}`)?.checked);
+            services = selected.length > 0 ? selected.join(', ') : '';
+        }
+    }
+
+    if (leadFields?.name !== false && !name) {
+        document.getElementById('oc-lead-error').style.display = 'block';
+        return;
+    }
+
+    if (needsContact && !email && !phone) {
+        document.getElementById('oc-contact-error').style.display = 'block';
+        return;
+    }
+
+    await onSubmit({ name, email, phone, company, custom, services });
+};
+
+// ── Triggered by agent "Send Form" button or AI fallback ──
+export const renderFormInChat = (leadFields, onSubmit) => {
+    const messages = document.getElementById('oc-messages');
+    if (!messages) return;
+
+    // Don't show if form already exists in DOM
+    if (document.getElementById('oc-lead-form')) return;
+
+    const { fieldsHTML, needsContact, hasServices } = buildFormFields(leadFields);
+
     const form = document.createElement('div');
     form.classList.add('oc-collect-form');
     form.id = 'oc-lead-form';
     form.innerHTML = `
         ${fieldsHTML}
-        <div id="oc-lead-error" style="
-            display:none;
-            color:#DC2626;
-            font-size:12px;
-            padding:6px 10px;
-            background:#FEE2E2;
-            border-radius:6px;
-        ">
+        <div id="oc-lead-error" style="display:none;color:#DC2626;font-size:12px;padding:6px 10px;background:#FEE2E2;border-radius:6px;">
             Please fill in your name to continue.
         </div>
         <button class="oc-collect-btn" id="oc-lead-submit">
-            Submit & Start Chat →
+            Submit →
         </button>
     `;
 
     messages.appendChild(form);
     messages.scrollTop = messages.scrollHeight;
 
-    // Handle submit
-    document.getElementById('oc-lead-submit').addEventListener('click', () => {
-        const name = document.getElementById('oc-field-name')?.value?.trim();
-        const email = document.getElementById('oc-field-email')?.value?.trim();
-        const countryCode = document.getElementById('oc-field-country')?.value || '';
-        const phoneRaw = document.getElementById('oc-field-phone')?.value?.trim();
-        const phone = phoneRaw ? `${countryCode} ${phoneRaw}` : '';
-        const company = document.getElementById('oc-field-company')?.value?.trim();
-        const custom = document.getElementById('oc-field-custom')?.value?.trim();
-
-        // Collect services
-        let services;
-        if (hasServices) {
-            if (leadFields.serviceSelectionType === 'dropdown') {
-                services = document.getElementById('oc-field-services')?.value || '';
-            } else {
-                const selected = leadFields.services
-                    .filter((_, i) => document.getElementById(`oc-service-${i}`)?.checked);
-                services = selected.length > 0 ? selected.join(', ') : '';
-            }
-        }
-
-        // Validate name
-        if (leadFields?.name !== false && !name) {
-            document.getElementById('oc-lead-error').style.display = 'block';
-            return;
-        }
-
-        // Validate at least email OR phone
-        if (needsContact && !email && !phone) {
-            document.getElementById('oc-contact-error').style.display = 'block';
-            return;
-        }
-
-        onSubmit({ name, email, phone, company, custom, services });
+    document.getElementById('oc-lead-submit').addEventListener('click', async () => {
+        const btn = document.getElementById('oc-lead-submit');
+        if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+        await handleFormSubmit(leadFields, hasServices, needsContact, onSubmit);
     });
 };
 
-
 export const showLeadSuccess = (name) => {
-  const messages = document.getElementById('oc-messages');
-  if (!messages) return;
+    const messages = document.getElementById('oc-messages');
+    if (!messages) return;
 
-  // Remove form
-  const form = document.getElementById('oc-lead-form');
-  if (form) form.remove();
+    const form = document.getElementById('oc-lead-form');
+    if (form) form.remove();
 
-  // Show success message
-  const success = document.createElement('div');
-  success.classList.add('oc-message', 'agent');
-  success.innerHTML = `
-        🎉 Thanks ${name || 'there'}! We've got your details.
-        Feel free to ask us anything!
-        <div class="oc-message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // AI bubble style — feels like a real response, not a system popup
+    const aiRow = document.createElement('div');
+    aiRow.style.cssText = 'display:flex;align-items:flex-end;gap:8px;justify-content:flex-end;margin:4px 0;';
+    aiRow.innerHTML = `
+        <div style="max-width:75%;background:#7C3AED;color:#fff;padding:10px 14px;border-radius:12px 12px 4px 12px;word-break:break-word;font-size:14px;line-height:1.4;">
+            <span style="display:inline-block;font-size:10px;font-weight:700;background:rgba(255,255,255,0.25);color:#fff;border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:middle;">AI</span>
+            Thanks ${name || 'there'}! 🎉 We've got your details and an agent will be in touch shortly. Feel free to keep chatting in the meantime!
+            <div style="font-size:10px;opacity:0.6;margin-top:4px;text-align:right;">${time}</div>
+        </div>
+        <div style="width:28px;height:28px;min-width:28px;border-radius:50%;background:#7C3AED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🤖</div>
     `;
-  messages.appendChild(success);
-  messages.scrollTop = messages.scrollHeight;
+    messages.appendChild(aiRow);
+    messages.scrollTop = messages.scrollHeight;
 };
 
 export const unlockChat = () => {
-  const input = document.getElementById('oc-input');
-  const sendBtn = document.getElementById('oc-send');
+    const input = document.getElementById('oc-input');
+    const sendBtn = document.getElementById('oc-send');
 
-  if (input) {
-    input.disabled = false;
-    input.placeholder = 'Type a message...';
-    input.style.backgroundColor = '';
-    input.style.color = '';
-    input.style.cursor = '';
-    input.focus();
-  }
-  if (sendBtn) {
-    sendBtn.disabled = false;
-    sendBtn.style.opacity = '1';
-  }
+    if (input) {
+        input.disabled = false;
+        input.placeholder = 'Type a message...';
+        input.style.backgroundColor = '';
+        input.style.color = '';
+        input.style.cursor = '';
+        input.focus();
+    }
+    if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.style.opacity = '1';
+    }
 };

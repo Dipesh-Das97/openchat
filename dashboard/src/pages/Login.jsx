@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useAgentStore from '../store/agentStore';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAgentStore((state) => state.setAuth);
   const setAgent = useAgentStore((state) => state.setAgent);
+  const isMobile = useIsMobile();
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -13,6 +15,10 @@ export default function Login() {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleLogin();
   };
 
   const handleLogin = async () => {
@@ -33,17 +39,14 @@ export default function Login() {
         return;
       }
 
-      // Set auth with firebaseToken from login response
       await setAuth(data.token, data.installId, data.firebaseToken);
 
-      // Fetch agent profile
       const profileRes = await fetch('http://localhost:5000/api/auth/me', {
         headers: { Authorization: `Bearer ${data.token}` },
       });
       const profile = await profileRes.json();
       setAgent(profile);
 
-      // Redirect based on onboarding status
       if (!profile.onboardingComplete) {
         navigate('/setup');
       } else {
@@ -58,7 +61,15 @@ export default function Login() {
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
+      <div style={{
+        ...styles.card,
+        padding: isMobile ? '36px 24px' : '48px 40px',
+        borderRadius: isMobile ? '0' : '16px',
+        minHeight: isMobile ? '100vh' : 'auto',
+        justifyContent: isMobile ? 'center' : 'flex-start',
+        boxShadow: isMobile ? 'none' : '0 4px 24px rgba(79,70,229,0.10)',
+        maxWidth: isMobile ? '100%' : '400px',
+      }}>
         {/* Logo */}
         <div style={styles.logo}>💬</div>
         <h1 style={styles.title}>OpenChat</h1>
@@ -77,6 +88,8 @@ export default function Login() {
             placeholder="you@example.com"
             value={form.email}
             onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            autoComplete="email"
           />
         </div>
 
@@ -89,6 +102,8 @@ export default function Login() {
             placeholder="••••••••"
             value={form.password}
             onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            autoComplete="current-password"
           />
         </div>
 
@@ -120,14 +135,11 @@ const styles = {
   },
   card: {
     backgroundColor: '#fff',
-    padding: '48px 40px',
-    borderRadius: '16px',
-    boxShadow: '0 4px 24px rgba(79,70,229,0.10)',
     width: '100%',
-    maxWidth: '400px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    boxSizing: 'border-box',
   },
   logo: {
     fontSize: '48px',
@@ -167,17 +179,17 @@ const styles = {
   },
   input: {
     width: '100%',
-    padding: '10px 14px',
+    padding: '12px 14px',
     borderRadius: '8px',
     border: '1px solid #D1D5DB',
-    fontSize: '14px',
+    fontSize: '16px', // 16px prevents iOS auto-zoom
     outline: 'none',
     boxSizing: 'border-box',
     color: '#111827',
   },
   button: {
     width: '100%',
-    padding: '12px',
+    padding: '14px',
     backgroundColor: '#4F46E5',
     color: '#fff',
     border: 'none',
@@ -187,6 +199,7 @@ const styles = {
     cursor: 'pointer',
     marginTop: '8px',
     marginBottom: '24px',
+    minHeight: '48px', // good touch target
   },
   footer: {
     fontSize: '14px',

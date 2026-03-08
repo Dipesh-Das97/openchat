@@ -4,39 +4,94 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { ref, onValue, push, remove } from 'firebase/database';
 import { db } from '../firebase';
 
+// ── Tab config ─────────────────────────────────────────────
+const TABS = [
+    { id: 'appearance', label: '🎨 Appearance' },
+    { id: 'leadForm',   label: '📋 Lead Form' },
+    { id: 'aiConfig',   label: '🤖 AI Config' },
+    { id: 'hours',      label: '⏰ Hours' },
+    { id: 'profile',    label: '👤 Profile' },
+];
+
 export default function Settings({ installId, token, agent }) {
     const setAgent = useAgentStore((state) => state.setAgent);
     const isMobile = useIsMobile();
 
-    const [copied, setCopied] = useState(false);
-    const [embedCopied, setEmbedCopied] = useState(false);
+    const [activeTab, setActiveTab] = useState('appearance');
+
+    // ── Shared feedback state ──────────────────────────────
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
-    const [kbQuestion, setKbQuestion] = useState('');
-    const [kbAnswer, setKbAnswer] = useState('');
-    const [kbEntries, setKbEntries] = useState([]);
-    const [savingKb, setSavingKb] = useState(false);
-    const [kbSuccess, setKbSuccess] = useState('');
-    const [kbLoaded, setKbLoaded] = useState(false);
 
-    const [form, setForm] = useState({
-        name: agent?.profile?.name || '',
-        company: agent?.profile?.company || '',
-        website: agent?.profile?.website || '',
+    const showSuccess = (msg) => {
+        setSuccess(msg);
+        setError('');
+        setTimeout(() => setSuccess(''), 3000);
+    };
+    const showError = (msg) => {
+        setError(msg);
+        setSuccess('');
+    };
+
+    // ── Appearance state ───────────────────────────────────
+    const [appearance, setAppearance] = useState({
+        companyName: agent?.appearance?.companyName || '',
+        welcomeMessage: agent?.appearance?.welcomeMessage || "Hi there! 👋 How can I help you today?",
+        primaryColor: agent?.appearance?.primaryColor || '#4F46E5',
+        position: agent?.appearance?.position || 'bottom-right',
+    });
+
+    // ── Lead Form state ────────────────────────────────────
+    const [leadFields, setLeadFields] = useState({
+        name: agent?.leadFields?.name ?? true,
+        email: agent?.leadFields?.email ?? true,
+        phone: agent?.leadFields?.phone ?? false,
+        company: agent?.leadFields?.company ?? false,
+        customQuestion: agent?.leadFields?.customQuestion || '',
+        customEnabled: agent?.leadFields?.customEnabled ?? false,
     });
     const [serviceInput, setServiceInput] = useState('');
-    const [services, setServices] = useState(
-        agent?.leadFields?.services || []
-    );
+    const [services, setServices] = useState(agent?.leadFields?.services || []);
     const [serviceSelectionType, setServiceSelectionType] = useState(
         agent?.leadFields?.serviceSelectionType || 'checklist'
     );
-    const [savingServices, setSavingServices] = useState(false);
-    const [serviceSuccess, setServiceSuccess] = useState('');
 
+    // ── AI Config state ────────────────────────────────────
+    const [aiConfig, setAiConfig] = useState({
+        botName: agent?.aiConfig?.botName || '',
+        fallbackMessage: agent?.aiConfig?.fallbackMessage || "I don't have information on that. Our team will get back to you shortly.",
+    });
+    const [kbQuestion, setKbQuestion] = useState('');
+    const [kbAnswer, setKbAnswer] = useState('');
+    const [kbEntries, setKbEntries] = useState([]);
+    const [kbLoaded, setKbLoaded] = useState(false);
+    const [savingKb, setSavingKb] = useState(false);
+
+    // ── Working Hours state ────────────────────────────────
+    const [workingHours, setWorkingHours] = useState(
+        agent?.workingHours || {
+            timezone: 'Asia/Kolkata',
+            mon: { enabled: true,  start: '09:00', end: '18:00' },
+            tue: { enabled: true,  start: '09:00', end: '18:00' },
+            wed: { enabled: true,  start: '09:00', end: '18:00' },
+            thu: { enabled: true,  start: '09:00', end: '18:00' },
+            fri: { enabled: true,  start: '09:00', end: '18:00' },
+            sat: { enabled: false, start: '09:00', end: '18:00' },
+            sun: { enabled: false, start: '09:00', end: '18:00' },
+        }
+    );
+
+    // ── Profile state ──────────────────────────────────────
+    const [profile, setProfile] = useState({
+        name:    agent?.profile?.name    || '',
+        company: agent?.profile?.company || '',
+        website: agent?.profile?.website || '',
+    });
+
+    // ── KB Firebase listener ───────────────────────────────
     useEffect(() => {
-        if (agent?.mode !== 'chat_bot' || !installId) return;
+        if (!agent?.features?.aiReply || !installId) return;
         const kbRef = ref(db, `knowledgeBase/${installId}`);
         const unsub = onValue(kbRef, (snap) => {
             if (!snap.exists()) { setKbEntries([]); setKbLoaded(true); return; }
@@ -45,18 +100,11 @@ export default function Settings({ installId, token, agent }) {
             setKbLoaded(true);
         });
         return () => unsub();
-    }, [agent?.mode, installId]);
+    }, [agent?.features?.aiReply, installId]);
 
-    const embedCode = `<script>
-  window.OpenChatConfig = { installId: "${installId}" }
-</script>
-<script src="https://cdn.jsdelivr.net/gh/Dipesh-Das97/openchat@v1.0/widget/dist/widget.js"></script>`;
-
-    const handleSave = async () => {
+    // ── Save helpers ───────────────────────────────────────
+    const saveSettings = async (payload) => {
         setSaving(true);
-        setSuccess('');
-        setError('');
-
         try {
             const res = await fetch('http://localhost:5000/api/agent/settings', {
                 method: 'PUT',
@@ -64,98 +112,81 @@ export default function Settings({ installId, token, agent }) {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ profile: form }),
+                body: JSON.stringify(payload),
             });
-
             const data = await res.json();
-            if (!res.ok) {
-                setError(data.error || 'Failed to save');
-                return;
-            }
-
-            setAgent({ ...agent, profile: { ...agent?.profile, ...form } });
-            setSuccess('Settings saved successfully!');
-        } catch (err) {
-            setError('Something went wrong.');
+            if (!res.ok) { showError(data.error || 'Failed to save'); return false; }
+            return data;
+        } catch {
+            showError('Something went wrong.');
+            return false;
         } finally {
             setSaving(false);
         }
     };
 
-    const handleAddService = () => {
-        const trimmed = serviceInput.trim();
-        if (!trimmed) return;
-        if (services.includes(trimmed)) return; // no duplicates
-        setServices([...services, trimmed]);
-        setServiceInput('');
-    };
-
-    const handleRemoveService = (index) => {
-        setServices(services.filter((_, i) => i !== index));
-    };
-
-    const handleSaveServices = async () => {
-        setSavingServices(true);
-        setServiceSuccess('');
-
-        try {
-            const res = await fetch('http://localhost:5000/api/agent/settings', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    leadFields: {
-                        ...agent?.leadFields,
-                        services,
-                        serviceSelectionType,
-                    },
-                }),
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                setError(data.error || 'Failed to save services');
-                return;
-            }
-
-            // Update local agent state
-            setAgent({
-                ...agent,
-                leadFields: {
-                    ...agent?.leadFields,
-                    services,
-                    serviceSelectionType,
-                },
-            });
-
-            setServiceSuccess('Services saved successfully!');
-        } catch (err) {
-            setError('Something went wrong.');
-        } finally {
-            setSavingServices(false);
+    const handleSaveAppearance = async () => {
+        const data = await saveSettings({ appearance });
+        if (data) {
+            setAgent({ ...agent, appearance });
+            showSuccess('Appearance saved!');
         }
     };
 
+    const handleSaveLeadForm = async () => {
+        const payload = {
+            leadFields: {
+                ...leadFields,
+                services,
+                serviceSelectionType,
+            },
+        };
+        const data = await saveSettings(payload);
+        if (data) {
+            setAgent({ ...agent, leadFields: payload.leadFields });
+            showSuccess('Lead form settings saved!');
+        }
+    };
+
+    const handleSaveAiConfig = async () => {
+        const data = await saveSettings({ aiConfig });
+        if (data) {
+            setAgent({ ...agent, aiConfig });
+            showSuccess('AI config saved!');
+        }
+    };
+
+    const handleSaveWorkingHours = async () => {
+        const data = await saveSettings({ workingHours });
+        if (data) {
+            setAgent({ ...agent, workingHours });
+            showSuccess('Working hours saved!');
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        const data = await saveSettings({ profile });
+        if (data) {
+            setAgent({ ...agent, profile: { ...agent?.profile, ...profile } });
+            showSuccess('Profile saved!');
+        }
+    };
+
+    // ── KB actions ─────────────────────────────────────────
     const handleAddKbEntry = async () => {
         const q = kbQuestion.trim();
         const a = kbAnswer.trim();
         if (!q || !a) return;
-
         setSavingKb(true);
         try {
             await push(ref(db, `knowledgeBase/${installId}`), {
-                question: q,
-                answer: a,
-                createdAt: Date.now(),
+                question: q, answer: a, createdAt: Date.now(),
             });
             setKbQuestion('');
             setKbAnswer('');
-            setKbSuccess('Entry added!');
-            setTimeout(() => setKbSuccess(''), 2000);
-        } catch (err) {
-            setError('Failed to add entry.');
+            showSuccess('Entry added!');
+        } catch {
+            showError('Failed to add entry.');
         } finally {
             setSavingKb(false);
         }
@@ -164,356 +195,513 @@ export default function Settings({ installId, token, agent }) {
     const handleRemoveKbEntry = async (id) => {
         try {
             await remove(ref(db, `knowledgeBase/${installId}/${id}`));
-        } catch (err) {
-            setError('Failed to remove entry.');
+        } catch {
+            showError('Failed to remove entry.');
         }
     };
 
+    // ── Services ───────────────────────────────────────────
+    const handleAddService = () => {
+        const trimmed = serviceInput.trim();
+        if (!trimmed || services.includes(trimmed)) return;
+        setServices([...services, trimmed]);
+        setServiceInput('');
+    };
+
+    const handleRemoveService = (index) => {
+        setServices(services.filter((_, i) => i !== index));
+    };
+
+    // ── Shared sub-components ──────────────────────────────
+    const Feedback = () => (
+        <>
+            {error   && <div style={styles.errorBox}>{error}</div>}
+            {success && <div style={styles.successBox}>{success}</div>}
+        </>
+    );
+
+    const SaveBtn = ({ onClick, label = 'Save Changes' }) => (
+        <button
+            style={{ ...styles.saveBtn, width: isMobile ? '100%' : 'auto', opacity: saving ? 0.7 : 1 }}
+            onClick={onClick}
+            disabled={saving}
+        >
+            {saving ? 'Saving...' : label}
+        </button>
+    );
+
+    const Toggle = ({ active, onToggle }) => (
+        <div
+            onClick={onToggle}
+            style={{
+                width: '44px', height: '24px', borderRadius: '12px',
+                backgroundColor: active ? '#4F46E5' : '#D1D5DB',
+                cursor: 'pointer', position: 'relative',
+                transition: 'background-color 0.2s', flexShrink: 0,
+            }}
+        >
+            <div style={{
+                position: 'absolute', top: '2px', width: '20px', height: '20px',
+                borderRadius: '50%', backgroundColor: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s',
+                transform: active ? 'translateX(22px)' : 'translateX(2px)',
+            }} />
+        </div>
+    );
+
+    const Checkbox = ({ checked, onChange, disabled }) => (
+        <div
+            onClick={() => !disabled && onChange(!checked)}
+            style={{
+                width: '20px', height: '20px', minWidth: '20px',
+                borderRadius: '4px',
+                border: `2px solid ${checked ? '#4F46E5' : '#D1D5DB'}`,
+                backgroundColor: checked ? '#4F46E5' : disabled ? '#F3F4F6' : '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s', flexShrink: 0,
+            }}
+        >
+            {checked && <span style={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}>✓</span>}
+        </div>
+    );
+
+    // ── Tab renders ────────────────────────────────────────
+
+    const renderAppearance = () => (
+        <div>
+            <Feedback />
+            <div style={styles.field}>
+                <label style={styles.label}>Company / Brand Name</label>
+                <input
+                    style={styles.input}
+                    type="text"
+                    placeholder="Acme Inc."
+                    value={appearance.companyName}
+                    onChange={(e) => setAppearance({ ...appearance, companyName: e.target.value })}
+                />
+            </div>
+            <div style={styles.field}>
+                <label style={styles.label}>Welcome Message</label>
+                <input
+                    style={styles.input}
+                    type="text"
+                    value={appearance.welcomeMessage}
+                    onChange={(e) => setAppearance({ ...appearance, welcomeMessage: e.target.value })}
+                />
+            </div>
+            <div style={styles.field}>
+                <label style={styles.label}>Primary Color</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                        type="color"
+                        value={appearance.primaryColor}
+                        onChange={(e) => setAppearance({ ...appearance, primaryColor: e.target.value })}
+                        style={styles.colorPicker}
+                    />
+                    <span style={{ fontSize: '13px', color: '#6B7280' }}>{appearance.primaryColor}</span>
+                    {['#4F46E5', '#059669', '#DC2626', '#D97706', '#0891B2'].map((color) => (
+                        <div
+                            key={color}
+                            onClick={() => setAppearance({ ...appearance, primaryColor: color })}
+                            style={{
+                                width: '26px', height: '26px', borderRadius: '50%',
+                                backgroundColor: color, cursor: 'pointer',
+                                border: appearance.primaryColor === color ? '3px solid #111827' : '2px solid transparent',
+                                transition: 'border 0.15s',
+                            }}
+                        />
+                    ))}
+                </div>
+            </div>
+            <div style={styles.field}>
+                <label style={styles.label}>Widget Position</label>
+                <div style={styles.radioRow}>
+                    {['bottom-right', 'bottom-left'].map((pos) => (
+                        <div
+                            key={pos}
+                            style={{
+                                ...styles.radioCard,
+                                borderColor: appearance.position === pos ? '#4F46E5' : '#E5E7EB',
+                                backgroundColor: appearance.position === pos ? '#EEF2FF' : '#fff',
+                                color: appearance.position === pos ? '#4F46E5' : '#6B7280',
+                            }}
+                            onClick={() => setAppearance({ ...appearance, position: pos })}
+                        >
+                            {pos === 'bottom-right' ? '↘ Bottom Right' : '↙ Bottom Left'}
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <SaveBtn onClick={handleSaveAppearance} />
+        </div>
+    );
+
+    const renderLeadForm = () => {
+        if (!agent?.features?.leadForm) {
+            return (
+                <div style={styles.disabledNotice}>
+                    <p style={styles.disabledText}>Lead Form is not enabled.</p>
+                    <p style={styles.disabledSub}>Enable it in Setup or turn it on in your feature flags.</p>
+                </div>
+            );
+        }
+        return (
+            <div>
+                <Feedback />
+                <p style={styles.tabSub}>Choose which fields to show on the lead capture form.</p>
+
+                {[
+                    { key: 'name',    label: 'Full Name',    required: true },
+                    { key: 'email',   label: 'Email Address', required: true },
+                    { key: 'phone',   label: 'Phone Number' },
+                    { key: 'company', label: 'Company Name' },
+                ].map(({ key, label, required }) => (
+                    <div key={key} style={styles.checkRow}>
+                        <Checkbox
+                            checked={leadFields[key]}
+                            onChange={(val) => !required && setLeadFields({ ...leadFields, [key]: val })}
+                            disabled={required}
+                        />
+                        <span style={styles.checkLabel}>{label}</span>
+                        {required && <span style={styles.requiredBadge}>Required</span>}
+                    </div>
+                ))}
+
+                <div style={{ ...styles.field, marginTop: '20px' }}>
+                    <label style={styles.label}>
+                        Custom Question <span style={styles.optionalBadge}>optional</span>
+                    </label>
+                    <input
+                        style={styles.input}
+                        type="text"
+                        placeholder="e.g. What service are you interested in?"
+                        value={leadFields.customQuestion}
+                        onChange={(e) => setLeadFields({
+                            ...leadFields,
+                            customQuestion: e.target.value,
+                            customEnabled: e.target.value.length > 0,
+                        })}
+                    />
+                </div>
+
+                <div style={styles.field}>
+                    <label style={styles.label}>
+                        Services Dropdown <span style={styles.optionalBadge}>optional</span>
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                            style={{ ...styles.input, flex: 1 }}
+                            type="text"
+                            placeholder="e.g. Web Design"
+                            value={serviceInput}
+                            onChange={(e) => setServiceInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddService()}
+                        />
+                        <button style={styles.addBtn} onClick={handleAddService}>Add</button>
+                    </div>
+                    {services.length > 0 && (
+                        <div style={styles.tagsContainer}>
+                            {services.map((s, i) => (
+                                <div key={i} style={styles.tag}>
+                                    <span style={styles.tagText}>{s}</span>
+                                    <button
+                                        style={styles.tagRemove}
+                                        onClick={() => handleRemoveService(i)}
+                                        aria-label={`Remove ${s}`}
+                                    >✕</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div style={styles.field}>
+                    <label style={styles.label}>Selection Type</label>
+                    <div style={styles.radioRow}>
+                        {['checklist', 'dropdown'].map((type) => (
+                            <div
+                                key={type}
+                                style={{
+                                    ...styles.radioCard,
+                                    borderColor: serviceSelectionType === type ? '#4F46E5' : '#E5E7EB',
+                                    backgroundColor: serviceSelectionType === type ? '#EEF2FF' : '#fff',
+                                    color: serviceSelectionType === type ? '#4F46E5' : '#6B7280',
+                                }}
+                                onClick={() => setServiceSelectionType(type)}
+                            >
+                                {type === 'checklist' ? '☑️ Checklist' : '📋 Dropdown'}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <SaveBtn onClick={handleSaveLeadForm} />
+            </div>
+        );
+    };
+
+    const renderAiConfig = () => {
+        if (!agent?.features?.aiReply) {
+            return (
+                <div style={styles.disabledNotice}>
+                    <p style={styles.disabledText}>AI Auto-reply is not enabled.</p>
+                    <p style={styles.disabledSub}>Enable it in Setup or turn it on in your feature flags.</p>
+                </div>
+            );
+        }
+        return (
+            <div>
+                <Feedback />
+                <div style={styles.field}>
+                    <label style={styles.label}>Bot Name</label>
+                    <input
+                        style={styles.input}
+                        type="text"
+                        placeholder="Aria, Max, Support Bot..."
+                        value={aiConfig.botName}
+                        onChange={(e) => setAiConfig({ ...aiConfig, botName: e.target.value })}
+                    />
+                </div>
+                <div style={{ ...styles.field }}>
+                    <label style={styles.label}>Fallback Message</label>
+                    <textarea
+                        style={{ ...styles.input, minHeight: '72px', resize: 'vertical', fontFamily: 'inherit' }}
+                        value={aiConfig.fallbackMessage}
+                        onChange={(e) => setAiConfig({ ...aiConfig, fallbackMessage: e.target.value })}
+                    />
+                    <p style={styles.fieldHint}>Sent when the AI can't find an answer in the knowledge base.</p>
+                </div>
+                <SaveBtn onClick={handleSaveAiConfig} label="Save AI Config" />
+
+                <div style={styles.divider} />
+
+                <p style={styles.sectionLabel}>Knowledge Base</p>
+                <p style={styles.tabSub}>Add Q&A pairs the AI will use to answer visitors.</p>
+
+                <div style={styles.field}>
+                    <label style={styles.label}>Question</label>
+                    <input
+                        style={styles.input}
+                        type="text"
+                        placeholder="e.g. What are your working hours?"
+                        value={kbQuestion}
+                        onChange={(e) => setKbQuestion(e.target.value)}
+                    />
+                </div>
+                <div style={styles.field}>
+                    <label style={styles.label}>Answer</label>
+                    <textarea
+                        style={{ ...styles.input, minHeight: '80px', resize: 'vertical', fontFamily: 'inherit' }}
+                        placeholder="e.g. We're open Mon–Fri, 9am to 6pm IST."
+                        value={kbAnswer}
+                        onChange={(e) => setKbAnswer(e.target.value)}
+                    />
+                </div>
+                <button
+                    style={{ ...styles.saveBtn, opacity: savingKb ? 0.7 : 1, marginBottom: '20px', width: isMobile ? '100%' : 'auto' }}
+                    onClick={handleAddKbEntry}
+                    disabled={savingKb}
+                >
+                    {savingKb ? 'Adding...' : '+ Add Entry'}
+                </button>
+
+                {kbLoaded && kbEntries.length === 0 && (
+                    <p style={styles.fieldHint}>No entries yet. Add your first FAQ above!</p>
+                )}
+                {kbEntries.map((entry) => (
+                    <div key={entry.id} style={styles.kbEntry}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={styles.kbQ}>Q: {entry.question}</p>
+                            <p style={styles.kbA}>A: {entry.answer}</p>
+                        </div>
+                        <button
+                            style={styles.kbRemove}
+                            onClick={() => handleRemoveKbEntry(entry.id)}
+                            aria-label="Remove entry"
+                        >✕</button>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    const renderWorkingHours = () => {
+        if (!agent?.features?.workingHours) {
+            return (
+                <div style={styles.disabledNotice}>
+                    <p style={styles.disabledText}>Working Hours is not enabled.</p>
+                    <p style={styles.disabledSub}>Enable it in Setup or turn it on in your feature flags.</p>
+                </div>
+            );
+        }
+        return (
+            <div>
+                <Feedback />
+                <div style={styles.field}>
+                    <label style={styles.label}>Timezone</label>
+                    <select
+                        style={styles.input}
+                        value={workingHours.timezone}
+                        onChange={(e) => setWorkingHours({ ...workingHours, timezone: e.target.value })}
+                    >
+                        <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                        <option value="America/New_York">America/New_York (EST)</option>
+                        <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                        <option value="Europe/London">Europe/London (GMT)</option>
+                        <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+                        <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                    </select>
+                </div>
+
+                {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => (
+                    <div key={day} style={styles.dayRow}>
+                        <Checkbox
+                            checked={workingHours[day].enabled}
+                            onChange={(val) => setWorkingHours({
+                                ...workingHours,
+                                [day]: { ...workingHours[day], enabled: val },
+                            })}
+                        />
+                        <span style={styles.dayLabel}>{day.toUpperCase()}</span>
+                        {workingHours[day].enabled ? (
+                            <>
+                                <input
+                                    style={styles.timeInput}
+                                    type="time"
+                                    value={workingHours[day].start}
+                                    onChange={(e) => setWorkingHours({
+                                        ...workingHours,
+                                        [day]: { ...workingHours[day], start: e.target.value },
+                                    })}
+                                />
+                                <span style={{ color: '#6B7280', fontSize: '13px' }}>to</span>
+                                <input
+                                    style={styles.timeInput}
+                                    type="time"
+                                    value={workingHours[day].end}
+                                    onChange={(e) => setWorkingHours({
+                                        ...workingHours,
+                                        [day]: { ...workingHours[day], end: e.target.value },
+                                    })}
+                                />
+                            </>
+                        ) : (
+                            <span style={{ color: '#9CA3AF', fontSize: '13px' }}>Off</span>
+                        )}
+                    </div>
+                ))}
+
+                <div style={{ marginTop: '20px' }}>
+                    <SaveBtn onClick={handleSaveWorkingHours} label="Save Hours" />
+                </div>
+            </div>
+        );
+    };
+
+    const renderProfile = () => (
+        <div>
+            <Feedback />
+            <div style={styles.field}>
+                <label style={styles.label}>Full Name</label>
+                <input
+                    style={styles.input}
+                    type="text"
+                    value={profile.name}
+                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                    placeholder="Your name"
+                />
+            </div>
+            <div style={styles.field}>
+                <label style={styles.label}>Email</label>
+                <input
+                    style={{ ...styles.input, backgroundColor: '#F9FAFB', color: '#9CA3AF' }}
+                    type="email"
+                    value={agent?.profile?.email || ''}
+                    disabled
+                />
+                <p style={styles.fieldHint}>Email cannot be changed.</p>
+            </div>
+            <div style={styles.field}>
+                <label style={styles.label}>Company</label>
+                <input
+                    style={styles.input}
+                    type="text"
+                    value={profile.company}
+                    onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                    placeholder="Your company name"
+                />
+            </div>
+            <div style={styles.field}>
+                <label style={styles.label}>Website</label>
+                <input
+                    style={styles.input}
+                    type="text"
+                    value={profile.website}
+                    onChange={(e) => setProfile({ ...profile, website: e.target.value })}
+                    placeholder="https://yoursite.com"
+                />
+            </div>
+            <SaveBtn onClick={handleSaveProfile} />
+        </div>
+    );
+
+    const tabContent = {
+        appearance: renderAppearance,
+        leadForm:   renderLeadForm,
+        aiConfig:   renderAiConfig,
+        hours:      renderWorkingHours,
+        profile:    renderProfile,
+    };
+
+    // ── Render ─────────────────────────────────────────────
     return (
         <div style={styles.container}>
             <div style={{
                 ...styles.content,
-                padding: isMobile ? '24px 16px' : '40px 24px',
-                paddingBottom: isMobile ? '100px' : '40px',
+                padding: isMobile ? '20px 16px 100px' : '40px 32px',
             }}>
-                <h1 style={{
-                    ...styles.pageTitle,
-                    fontSize: isMobile ? '20px' : '24px',
-                }}>
+                <h1 style={{ ...styles.pageTitle, fontSize: isMobile ? '20px' : '24px' }}>
                     Settings
                 </h1>
 
-                {/* ── Install ID ── */}
-                <div style={styles.section}>
-                    <h2 style={styles.sectionTitle}>Your Install ID</h2>
-                    <p style={styles.sectionSub}>
-                        Use this to embed the widget on your website.
-                    </p>
-                    <div style={{
-                        ...styles.installIdBox,
-                        flexDirection: isMobile ? 'column' : 'row',
-                        alignItems: isMobile ? 'stretch' : 'center',
-                    }}>
-                        <code style={styles.installIdText}>{installId}</code>
+                {/* Tab Bar */}
+                <div style={{
+                    ...styles.tabBar,
+                    overflowX: isMobile ? 'auto' : 'visible',
+                    WebkitOverflowScrolling: 'touch',
+                }}>
+                    {TABS.map((tab) => (
                         <button
+                            key={tab.id}
                             style={{
-                                ...styles.copyBtn,
-                                backgroundColor: copied ? '#059669' : '#4F46E5',
+                                ...styles.tabBtn,
+                                borderBottom: activeTab === tab.id ? '2px solid #4F46E5' : '2px solid transparent',
+                                color: activeTab === tab.id ? '#4F46E5' : '#6B7280',
+                                fontWeight: activeTab === tab.id ? '700' : '500',
+                                whiteSpace: 'nowrap',
                             }}
                             onClick={() => {
-                                navigator.clipboard.writeText(installId);
-                                setCopied(true);
-                                setTimeout(() => setCopied(false), 2000);
+                                setActiveTab(tab.id);
+                                setSuccess('');
+                                setError('');
                             }}
                         >
-                            {copied ? '✅ Copied!' : '📋 Copy ID'}
+                            {tab.label}
                         </button>
-                    </div>
+                    ))}
                 </div>
 
-                {/* ── Embed Code ── */}
-                <div style={styles.section}>
-                    <h2 style={styles.sectionTitle}>Embed Code</h2>
-                    <p style={styles.sectionSub}>
-                        Paste this before the &lt;/body&gt; tag on your website.
-                    </p>
-                    <div style={styles.embedBox}>
-                        <pre style={styles.embedCode}>{embedCode}</pre>
-                        <button
-                            style={{
-                                ...styles.embedCopyBtn,
-                                backgroundColor: embedCopied ? '#059669' : '#4F46E5',
-                            }}
-                            onClick={() => {
-                                navigator.clipboard.writeText(embedCode);
-                                setEmbedCopied(true);
-                                setTimeout(() => setEmbedCopied(false), 2000);
-                            }}
-                        >
-                            {embedCopied ? '✅ Copied!' : '📋 Copy Code'}
-                        </button>
-                    </div>
+                {/* Tab Content */}
+                <div style={styles.tabContent}>
+                    {tabContent[activeTab]?.()}
                 </div>
-
-                {/* ── Profile ── */}
-                <div style={styles.section}>
-                    <h2 style={styles.sectionTitle}>Profile</h2>
-                    <p style={styles.sectionSub}>Update your name and company details.</p>
-
-                    {error && <div style={styles.error}>{error}</div>}
-                    {success && <div style={styles.successMsg}>{success}</div>}
-
-                    <div style={styles.field}>
-                        <label style={styles.label}>Full Name</label>
-                        <input
-                            style={styles.input}
-                            type="text"
-                            value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
-                            placeholder="Your name"
-                        />
-                    </div>
-
-                    <div style={styles.field}>
-                        <label style={styles.label}>Email</label>
-                        <input
-                            style={{
-                                ...styles.input,
-                                backgroundColor: '#F9FAFB',
-                                color: '#9CA3AF',
-                            }}
-                            type="email"
-                            value={agent?.profile?.email || ''}
-                            disabled
-                        />
-                        <p style={styles.fieldHint}>Email cannot be changed.</p>
-                    </div>
-
-                    <div style={styles.field}>
-                        <label style={styles.label}>Company</label>
-                        <input
-                            style={styles.input}
-                            type="text"
-                            value={form.company}
-                            onChange={(e) => setForm({ ...form, company: e.target.value })}
-                            placeholder="Your company name"
-                        />
-                    </div>
-
-                    <div style={styles.field}>
-                        <label style={styles.label}>Website</label>
-                        <input
-                            style={styles.input}
-                            type="text"
-                            value={form.website}
-                            onChange={(e) => setForm({ ...form, website: e.target.value })}
-                            placeholder="https://yoursite.com"
-                        />
-                    </div>
-
-                    <button
-                        style={{
-                            ...styles.saveBtn,
-                            width: isMobile ? '100%' : 'auto',
-                            opacity: saving ? 0.7 : 1,
-                        }}
-                        onClick={handleSave}
-                        disabled={saving}
-                    >
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
-                </div>
-
-                {/* ── Lead Gen Services ── */}
-                {agent?.mode === 'lead_gen' && (
-                    <div style={styles.section}>
-                        <h2 style={styles.sectionTitle}>Lead Gen Services</h2>
-                        <p style={styles.sectionSub}>
-                            Visitors will see these services in your lead capture form.
-                        </p>
-
-                        {/* Selection type toggle */}
-                        <div style={styles.field}>
-                            <label style={styles.label}>Selection Type</label>
-                            <div style={styles.radioRow}>
-                                {['checklist', 'dropdown'].map((type) => (
-                                    <div
-                                        key={type}
-                                        style={{
-                                            ...styles.radioCard,
-                                            borderColor: serviceSelectionType === type ? '#4F46E5' : '#E5E7EB',
-                                            backgroundColor: serviceSelectionType === type ? '#EEF2FF' : '#fff',
-                                            color: serviceSelectionType === type ? '#4F46E5' : '#6B7280',
-                                        }}
-                                        onClick={() => setServiceSelectionType(type)}
-                                    >
-                                        {type === 'checklist' ? '☑️ Checklist' : '📋 Dropdown'}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Add service input */}
-                        <div style={styles.field}>
-                            <label style={styles.label}>Add Service</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    style={styles.input}
-                                    type="text"
-                                    placeholder="e.g. Web Design"
-                                    value={serviceInput}
-                                    onChange={(e) => setServiceInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleAddService();
-                                    }}
-                                />
-                                <button
-                                    style={styles.addServiceBtn}
-                                    onClick={handleAddService}
-                                >
-                                    Add
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Service tags */}
-                        {services.length > 0 && (
-                            <div style={styles.tagsContainer}>
-                                {services.map((service, index) => (
-                                    <div key={index} style={styles.tag}>
-                                        <span style={styles.tagText}>{service}</span>
-                                        <button
-                                            style={styles.tagRemove}
-                                            onClick={() => handleRemoveService(index)}
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {services.length === 0 && (
-                            <p style={styles.fieldHint}>No services added yet. Add some above!</p>
-                        )}
-
-                        <button
-                            style={{
-                                ...styles.saveBtn,
-                                width: isMobile ? '100%' : 'auto',
-                                marginTop: '16px',
-                                opacity: savingServices ? 0.7 : 1,
-                            }}
-                            onClick={handleSaveServices}
-                            disabled={savingServices}
-                        >
-                            {savingServices ? 'Saving...' : 'Save Services'}
-                        </button>
-
-                        {serviceSuccess && (
-                            <div style={{ ...styles.successMsg, marginTop: '12px' }}>
-                                {serviceSuccess}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ── Knowledge Base (Chat Bot mode only) ── */}
-                {agent?.mode === 'chat_bot' && (
-                    <div style={styles.section}>
-                        <h2 style={styles.sectionTitle}>Knowledge Base</h2>
-                        <p style={styles.sectionSub}>
-                            Add FAQs so the AI can answer visitor questions accurately.
-                        </p>
-
-                        {kbSuccess && (
-                            <div style={{ ...styles.successMsg, marginBottom: '16px' }}>
-                                {kbSuccess}
-                            </div>
-                        )}
-
-                        {/* Add entry form */}
-                        <div style={styles.field}>
-                            <label style={styles.label}>Question</label>
-                            <input
-                                style={styles.input}
-                                type="text"
-                                placeholder="e.g. What are your working hours?"
-                                value={kbQuestion}
-                                onChange={(e) => setKbQuestion(e.target.value)}
-                            />
-                        </div>
-
-                        <div style={styles.field}>
-                            <label style={styles.label}>Answer</label>
-                            <textarea
-                                style={{
-                                    ...styles.input,
-                                    minHeight: '80px',
-                                    resize: 'vertical',
-                                    fontFamily: 'Arial, sans-serif',
-                                }}
-                                placeholder="e.g. We're open Monday to Friday, 9am to 6pm IST."
-                                value={kbAnswer}
-                                onChange={(e) => setKbAnswer(e.target.value)}
-                            />
-                        </div>
-
-                        <button
-                            style={{
-                                ...styles.saveBtn,
-                                width: isMobile ? '100%' : 'auto',
-                                opacity: savingKb ? 0.7 : 1,
-                                marginBottom: '24px',
-                            }}
-                            onClick={handleAddKbEntry}
-                            disabled={savingKb}
-                        >
-                            {savingKb ? 'Adding...' : '+ Add Entry'}
-                        </button>
-
-                        {/* Existing entries */}
-                        {kbEntries.length === 0 && kbLoaded && (
-                            <p style={styles.fieldHint}>
-                                No entries yet. Add your first FAQ above!
-                            </p>
-                        )}
-
-                        {kbEntries.map((entry) => (
-                            <div key={entry.id} style={styles.kbEntry}>
-                                <div style={styles.kbEntryContent}>
-                                    <p style={styles.kbQuestion}>Q: {entry.question}</p>
-                                    <p style={styles.kbAnswer}>A: {entry.answer}</p>
-                                </div>
-                                <button
-                                    style={styles.kbRemoveBtn}
-                                    onClick={() => handleRemoveKbEntry(entry.id)}
-                                    title="Remove entry"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* ── Account Info ── */}
-                <div style={styles.section}>
-                    <h2 style={styles.sectionTitle}>Account</h2>
-                    <div style={{
-                        ...styles.accountRow,
-                        flexDirection: isMobile ? 'column' : 'row',
-                        gap: isMobile ? '16px' : '32px',
-                    }}>
-                        <div>
-                            <p style={styles.accountLabel}>Email verification</p>
-                            <p style={styles.accountValue}>
-                                {agent?.emailVerified ? '✅ Verified' : '⚠️ Not verified'}
-                            </p>
-                        </div>
-                        <div>
-                            <p style={styles.accountLabel}>Current mode</p>
-                            <p style={styles.accountValue}>
-                                {agent?.mode === 'chat_app' && '💬 Chat App'}
-                                {agent?.mode === 'chat_bot' && '🤖 Chat Bot'}
-                                {agent?.mode === 'lead_gen' && '📋 Lead Gen'}
-                                {!agent?.mode && '—'}
-                            </p>
-                        </div>
-                        <div>
-                            <p style={styles.accountLabel}>Onboarding</p>
-                            <p style={styles.accountValue}>
-                                {agent?.onboardingComplete ? '✅ Complete' : '⚠️ Incomplete'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
     );
 }
 
+// ── Styles ─────────────────────────────────────────────────
 const styles = {
     container: {
         flex: 1,
@@ -523,82 +711,60 @@ const styles = {
     content: {
         maxWidth: '640px',
         margin: '0 auto',
+        boxSizing: 'border-box',
     },
     pageTitle: {
         fontWeight: '800',
         color: '#111827',
-        margin: '0 0 32px 0',
+        margin: '0 0 24px 0',
     },
-    section: {
+    tabBar: {
+        display: 'flex',
+        borderBottom: '1px solid #E5E7EB',
+        marginBottom: '28px',
+        gap: '4px',
+    },
+    tabBtn: {
+        padding: '10px 14px',
+        background: 'none',
+        border: 'none',
+        borderBottom: '2px solid transparent',
+        cursor: 'pointer',
+        fontSize: '13px',
+        transition: 'all 0.15s',
+        minHeight: '44px',
+    },
+    tabContent: {
         backgroundColor: '#fff',
+        border: '1px solid #E5E7EB',
         borderRadius: '12px',
         padding: '24px',
-        marginBottom: '24px',
-        border: '1px solid #E5E7EB',
     },
-    sectionTitle: {
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#111827',
-        margin: '0 0 4px 0',
-    },
-    sectionSub: {
+    tabSub: {
         fontSize: '13px',
         color: '#6B7280',
-        margin: '0 0 16px 0',
+        margin: '0 0 20px 0',
+        lineHeight: '1.5',
     },
-    installIdBox: {
-        display: 'flex',
-        gap: '12px',
-        backgroundColor: '#F3F4F6',
-        borderRadius: '8px',
-        padding: '12px 16px',
-    },
-    installIdText: {
+    sectionLabel: {
         fontSize: '13px',
-        color: '#1E1B4B',
-        flex: 1,
-        wordBreak: 'break-all',
+        fontWeight: '700',
+        color: '#4F46E5',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        margin: '0 0 8px 0',
     },
-    copyBtn: {
-        padding: '8px 16px',
-        border: 'none',
-        borderRadius: '6px',
-        color: '#fff',
-        fontSize: '13px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        flexShrink: 0,
-        transition: 'background-color 0.2s',
-    },
-    embedBox: {
-        backgroundColor: '#1E1B4B',
-        borderRadius: '10px',
-        padding: '16px',
-    },
-    embedCode: {
-        color: '#A5B4FC',
-        fontSize: '12px',
-        margin: '0 0 12px 0',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-all',
-    },
-    embedCopyBtn: {
-        width: '100%',
-        padding: '10px',
-        border: 'none',
-        borderRadius: '6px',
-        color: '#fff',
-        fontSize: '14px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s',
+    divider: {
+        borderTop: '1px solid #E5E7EB',
+        margin: '24px 0',
     },
     field: {
         marginBottom: '16px',
     },
     label: {
-        display: 'block',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
         fontSize: '14px',
         fontWeight: '600',
         color: '#374151',
@@ -606,69 +772,35 @@ const styles = {
     },
     input: {
         width: '100%',
-        padding: '10px 14px',
+        padding: '12px 14px',
         borderRadius: '8px',
         border: '1px solid #D1D5DB',
-        fontSize: '14px',
+        fontSize: '16px',
         outline: 'none',
         boxSizing: 'border-box',
         color: '#111827',
+        fontFamily: 'inherit',
     },
     fieldHint: {
         fontSize: '12px',
         color: '#9CA3AF',
         margin: '4px 0 0 0',
     },
-    saveBtn: {
-        padding: '10px 24px',
-        backgroundColor: '#4F46E5',
-        color: '#fff',
-        border: 'none',
+    colorPicker: {
+        width: '44px',
+        height: '40px',
         borderRadius: '8px',
-        fontSize: '14px',
-        fontWeight: '600',
+        border: '1px solid #D1D5DB',
         cursor: 'pointer',
-        marginTop: '8px',
+        padding: '2px',
     },
-    error: {
-        backgroundColor: '#FEE2E2',
-        color: '#DC2626',
-        padding: '10px 16px',
-        borderRadius: '8px',
-        fontSize: '14px',
-        marginBottom: '16px',
-    },
-    successMsg: {
-        backgroundColor: '#D1FAE5',
-        color: '#059669',
-        padding: '10px 16px',
-        borderRadius: '8px',
-        fontSize: '14px',
-        marginBottom: '16px',
-    },
-    accountRow: {
-        display: 'flex',
-    },
-    accountLabel: {
-        fontSize: '12px',
-        color: '#6B7280',
-        margin: '0 0 4px 0',
-    },
-    accountValue: {
-        fontSize: '14px',
-        fontWeight: '600',
-        color: '#111827',
-        margin: 0,
-    },
-
     radioRow: {
         display: 'flex',
         gap: '12px',
-        marginBottom: '4px',
     },
     radioCard: {
         flex: 1,
-        padding: '10px',
+        padding: '12px',
         border: '2px solid #E5E7EB',
         borderRadius: '8px',
         cursor: 'pointer',
@@ -676,23 +808,56 @@ const styles = {
         fontSize: '14px',
         fontWeight: '600',
         transition: 'all 0.15s',
+        minHeight: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    addServiceBtn: {
-        padding: '10px 20px',
+    checkRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '12px',
+    },
+    checkLabel: {
+        fontSize: '14px',
+        fontWeight: '500',
+        color: '#374151',
+        flex: 1,
+    },
+    requiredBadge: {
+        fontSize: '11px',
+        backgroundColor: '#EEF2FF',
+        color: '#4F46E5',
+        padding: '2px 8px',
+        borderRadius: '20px',
+        fontWeight: '600',
+    },
+    optionalBadge: {
+        fontSize: '11px',
+        backgroundColor: '#F3F4F6',
+        color: '#9CA3AF',
+        padding: '2px 8px',
+        borderRadius: '20px',
+        fontWeight: '500',
+    },
+    addBtn: {
+        padding: '12px 16px',
         backgroundColor: '#4F46E5',
         color: '#fff',
         border: 'none',
         borderRadius: '8px',
-        fontSize: '14px',
+        fontSize: '13px',
         fontWeight: '600',
         cursor: 'pointer',
         flexShrink: 0,
+        minHeight: '48px',
     },
     tagsContainer: {
         display: 'flex',
         flexWrap: 'wrap',
         gap: '8px',
-        marginBottom: '8px',
+        marginTop: '10px',
     },
     tag: {
         display: 'flex',
@@ -701,7 +866,7 @@ const styles = {
         backgroundColor: '#EEF2FF',
         border: '1px solid #C7D2FE',
         borderRadius: '20px',
-        padding: '4px 10px 4px 12px',
+        padding: '5px 10px 5px 12px',
     },
     tagText: {
         fontSize: '13px',
@@ -713,37 +878,60 @@ const styles = {
         border: 'none',
         color: '#4F46E5',
         cursor: 'pointer',
-        fontSize: '11px',
+        fontSize: '12px',
         padding: '0',
+        opacity: 0.7,
+        minHeight: '24px',
+        minWidth: '24px',
         display: 'flex',
         alignItems: 'center',
-        opacity: 0.7,
+        justifyContent: 'center',
+    },
+    dayRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '12px',
+    },
+    dayLabel: {
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#374151',
+        width: '36px',
+        flexShrink: 0,
+    },
+    timeInput: {
+        padding: '6px 10px',
+        borderRadius: '6px',
+        border: '1px solid #D1D5DB',
+        fontSize: '13px',
+        color: '#111827',
+        minHeight: '36px',
     },
     kbEntry: {
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '12px',
+        gap: '10px',
         backgroundColor: '#F9FAFB',
         border: '1px solid #E5E7EB',
         borderRadius: '8px',
-        padding: '12px 16px',
-        marginBottom: '10px',
+        padding: '12px 14px',
+        marginBottom: '8px',
     },
-    kbEntryContent: {
-        flex: 1,
-    },
-    kbQuestion: {
+    kbQ: {
         fontSize: '13px',
         fontWeight: '700',
         color: '#111827',
         margin: '0 0 4px 0',
+        wordBreak: 'break-word',
     },
-    kbAnswer: {
+    kbA: {
         fontSize: '13px',
         color: '#6B7280',
         margin: 0,
+        wordBreak: 'break-word',
     },
-    kbRemoveBtn: {
+    kbRemove: {
         background: 'none',
         border: 'none',
         color: '#9CA3AF',
@@ -751,6 +939,55 @@ const styles = {
         fontSize: '14px',
         padding: '0',
         flexShrink: 0,
-        lineHeight: 1,
+        minHeight: '32px',
+        minWidth: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveBtn: {
+        padding: '12px 24px',
+        backgroundColor: '#4F46E5',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        minHeight: '48px',
+        transition: 'opacity 0.15s',
+    },
+    errorBox: {
+        backgroundColor: '#FEE2E2',
+        color: '#DC2626',
+        padding: '10px 16px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        marginBottom: '16px',
+        boxSizing: 'border-box',
+    },
+    successBox: {
+        backgroundColor: '#D1FAE5',
+        color: '#059669',
+        padding: '10px 16px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        marginBottom: '16px',
+        boxSizing: 'border-box',
+    },
+    disabledNotice: {
+        textAlign: 'center',
+        padding: '40px 20px',
+    },
+    disabledText: {
+        fontSize: '15px',
+        fontWeight: '600',
+        color: '#374151',
+        margin: '0 0 8px 0',
+    },
+    disabledSub: {
+        fontSize: '13px',
+        color: '#9CA3AF',
+        margin: 0,
     },
 };

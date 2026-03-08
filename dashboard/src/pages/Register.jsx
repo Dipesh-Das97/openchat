@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useAgentStore from '../store/agentStore';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function Register() {
     const navigate = useNavigate();
     const setAuth = useAgentStore((state) => state.setAuth);
+    const isMobile = useIsMobile();
 
     const [form, setForm] = useState({
         name: '',
@@ -39,6 +41,7 @@ export default function Register() {
         setError('');
         setSuccess('');
         setLoading(true);
+
         if (form.password !== form.confirmPassword) {
             setError('Passwords do not match');
             setLoading(false);
@@ -65,8 +68,8 @@ export default function Register() {
             }
 
             setAuth(data.token, data.installId);
-            setSuccess('Account created! Please check your email to verify your account.');
-            setTimeout(() => navigate('/setup'), 3000);
+            setSuccess('Account created! Redirecting you to setup...');
+            setTimeout(() => navigate('/setup'), 2000);
         } catch (err) {
             setError('Something went wrong. Please try again.');
         } finally {
@@ -75,20 +78,28 @@ export default function Register() {
     };
 
     return (
-        <div style={styles.container}>
-            <div style={styles.card}>
+        <div style={{
+            ...styles.container,
+            padding: isMobile ? '0' : '24px',
+            alignItems: isMobile ? 'flex-start' : 'center',
+        }}>
+            <div style={{
+                ...styles.card,
+                padding: isMobile ? '36px 24px 48px' : '48px 40px',
+                borderRadius: isMobile ? '0' : '16px',
+                minHeight: isMobile ? '100vh' : 'auto',
+                maxWidth: isMobile ? '100%' : '480px',
+                boxShadow: isMobile ? 'none' : '0 4px 24px rgba(79,70,229,0.10)',
+            }}>
                 {/* Logo */}
                 <div style={styles.logo}>💬</div>
                 <h1 style={styles.title}>OpenChat</h1>
                 <p style={styles.subtitle}>Create your agent account</p>
 
-                {/* Error */}
                 {error && <div style={styles.error}>{error}</div>}
+                {success && <div style={styles.successBox}>{success}</div>}
 
-                {/* Success */}
-                {success && <div style={styles.success}>{success}</div>}
-
-                {/* Name + Email */}
+                {/* Full Name */}
                 <div style={styles.field}>
                     <label style={styles.label}>Full Name</label>
                     <input
@@ -98,9 +109,11 @@ export default function Register() {
                         placeholder="Dipesh Das"
                         value={form.name}
                         onChange={handleChange}
+                        autoComplete="name"
                     />
                 </div>
 
+                {/* Email */}
                 <div style={styles.field}>
                     <label style={styles.label}>Email</label>
                     <input
@@ -110,6 +123,7 @@ export default function Register() {
                         placeholder="you@example.com"
                         value={form.email}
                         onChange={handleChange}
+                        autoComplete="email"
                     />
                 </div>
 
@@ -124,6 +138,7 @@ export default function Register() {
                             placeholder="••••••••"
                             value={form.password}
                             onChange={handleChange}
+                            autoComplete="new-password"
                         />
                         <button
                             type="button"
@@ -152,21 +167,30 @@ export default function Register() {
                         placeholder="••••••••"
                         value={form.confirmPassword || ''}
                         onChange={handleChange}
+                        autoComplete="new-password"
                     />
-                    {/* Live feedback */}
                     {form.confirmPassword && (
                         <p style={{
                             fontSize: '12px',
                             marginTop: '4px',
                             color: form.password === form.confirmPassword ? '#059669' : '#DC2626',
                         }}>
-                            {form.password === form.confirmPassword ? '✅ Passwords match' : '❌ Passwords do not match'}
+                            {form.password === form.confirmPassword
+                                ? '✅ Passwords match'
+                                : '❌ Passwords do not match'}
                         </p>
                     )}
                 </div>
 
                 {/* Business Toggle */}
-                <div style={styles.toggleRow} onClick={handleBusinessToggle}>
+                <div
+                    style={{
+                        ...styles.toggleRow,
+                        backgroundColor: isBusiness ? '#EEF2FF' : '#FAFAFA',
+                        borderColor: isBusiness ? '#C7D2FE' : '#E5E7EB',
+                    }}
+                    onClick={handleBusinessToggle}
+                >
                     <div style={{
                         ...styles.checkbox,
                         backgroundColor: isBusiness ? '#4F46E5' : '#fff',
@@ -180,32 +204,34 @@ export default function Register() {
                     </div>
                 </div>
 
-                {/* Business Fields — animated show/hide */}
+                {/* Business Fields — stacks on mobile */}
                 {isBusiness && (
-                    <div style={styles.businessFields}>
-                        <div style={styles.row}>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Company Name</label>
-                                <input
-                                    style={styles.input}
-                                    type="text"
-                                    name="company"
-                                    placeholder="Acme Inc."
-                                    value={form.company}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Website</label>
-                                <input
-                                    style={styles.input}
-                                    type="text"
-                                    name="website"
-                                    placeholder="https://acme.com"
-                                    value={form.website}
-                                    onChange={handleChange}
-                                />
-                            </div>
+                    <div style={{
+                        ...styles.businessRow,
+                        flexDirection: isMobile ? 'column' : 'row',
+                        gap: isMobile ? '0' : '16px',
+                    }}>
+                        <div style={styles.field}>
+                            <label style={styles.label}>Company Name</label>
+                            <input
+                                style={styles.input}
+                                type="text"
+                                name="company"
+                                placeholder="Acme Inc."
+                                value={form.company}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div style={styles.field}>
+                            <label style={styles.label}>Website</label>
+                            <input
+                                style={styles.input}
+                                type="text"
+                                name="website"
+                                placeholder="https://acme.com"
+                                value={form.website}
+                                onChange={handleChange}
+                            />
                         </div>
                     </div>
                 )}
@@ -231,22 +257,17 @@ const styles = {
     container: {
         minHeight: '100vh',
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#F5F3FF',
         fontFamily: 'Arial, sans-serif',
-        padding: '24px',
     },
     card: {
         backgroundColor: '#fff',
-        padding: '48px 40px',
-        borderRadius: '16px',
-        boxShadow: '0 4px 24px rgba(79,70,229,0.10)',
         width: '100%',
-        maxWidth: '480px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        boxSizing: 'border-box',
     },
     logo: {
         fontSize: '48px',
@@ -263,33 +284,6 @@ const styles = {
         color: '#6B7280',
         marginBottom: '32px',
     },
-    passwordWrapper: {
-        position: 'relative',
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-    },
-    passwordInput: {
-        width: '100%',
-        padding: '10px 40px 10px 14px',
-        borderRadius: '8px',
-        border: '1px solid #D1D5DB',
-        fontSize: '14px',
-        outline: 'none',
-        boxSizing: 'border-box',
-        color: '#111827',
-    },
-    eyeButton: {
-        position: 'absolute',
-        right: '10px',
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        fontSize: '16px',
-        padding: '0',
-        display: 'flex',
-        alignItems: 'center',
-    },
     error: {
         backgroundColor: '#FEE2E2',
         color: '#DC2626',
@@ -300,7 +294,7 @@ const styles = {
         width: '100%',
         boxSizing: 'border-box',
     },
-    success: {
+    successBox: {
         backgroundColor: '#D1FAE5',
         color: '#059669',
         padding: '10px 16px',
@@ -309,6 +303,55 @@ const styles = {
         marginBottom: '16px',
         width: '100%',
         boxSizing: 'border-box',
+    },
+    field: {
+        width: '100%',
+        marginBottom: '16px',
+    },
+    label: {
+        display: 'block',
+        fontSize: '14px',
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: '6px',
+    },
+    input: {
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: '8px',
+        border: '1px solid #D1D5DB',
+        fontSize: '16px', // prevents iOS zoom
+        outline: 'none',
+        boxSizing: 'border-box',
+        color: '#111827',
+    },
+    passwordWrapper: {
+        position: 'relative',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+    },
+    passwordInput: {
+        width: '100%',
+        padding: '12px 44px 12px 14px',
+        borderRadius: '8px',
+        border: '1px solid #D1D5DB',
+        fontSize: '16px', // prevents iOS zoom
+        outline: 'none',
+        boxSizing: 'border-box',
+        color: '#111827',
+    },
+    eyeButton: {
+        position: 'absolute',
+        right: '12px',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '16px',
+        padding: '0',
+        display: 'flex',
+        alignItems: 'center',
+        minHeight: '44px', // touch target
     },
     toggleRow: {
         display: 'flex',
@@ -320,8 +363,8 @@ const styles = {
         border: '1px solid #E5E7EB',
         marginBottom: '16px',
         cursor: 'pointer',
-        backgroundColor: '#FAFAFA',
         transition: 'all 0.2s',
+        boxSizing: 'border-box',
     },
     checkbox: {
         width: '20px',
@@ -351,38 +394,13 @@ const styles = {
         color: '#6B7280',
         margin: '2px 0 0 0',
     },
-    businessFields: {
-        width: '100%',
-    },
-    row: {
+    businessRow: {
         display: 'flex',
-        gap: '16px',
         width: '100%',
-    },
-    field: {
-        width: '100%',
-        marginBottom: '16px',
-    },
-    label: {
-        display: 'block',
-        fontSize: '14px',
-        fontWeight: '600',
-        color: '#374151',
-        marginBottom: '6px',
-    },
-    input: {
-        width: '100%',
-        padding: '10px 14px',
-        borderRadius: '8px',
-        border: '1px solid #D1D5DB',
-        fontSize: '14px',
-        outline: 'none',
-        boxSizing: 'border-box',
-        color: '#111827',
     },
     button: {
         width: '100%',
-        padding: '12px',
+        padding: '14px',
         backgroundColor: '#4F46E5',
         color: '#fff',
         border: 'none',
@@ -392,6 +410,7 @@ const styles = {
         cursor: 'pointer',
         marginTop: '8px',
         marginBottom: '24px',
+        minHeight: '48px',
     },
     footer: {
         fontSize: '14px',

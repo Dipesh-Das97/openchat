@@ -1,15 +1,15 @@
 const { db } = require('../firebase');
 const { generateReply } = require('./aiService');
 
-const activeTimers = new Map(); // conversationId → timer
+const activeTimers = new Map();
 
-const ESCALATION_DELAY = 20 * 60 * 1000; // 20 minutes
+// const ESCALATION_DELAY = 20 * 60 * 1000; // 20 minutes
+const ESCALATION_DELAY = 30 * 1000; // Test
 
-const startEscalationTimer = (conversationId, installId) => {
-    // Clear any existing timer for this conversation
+const startEscalationTimer = (conversationId, installId, visitorMessage) => {
     cancelEscalationTimer(conversationId);
 
-    console.log(`⏱ Starting 20-min escalation timer for ${conversationId}`);
+    console.log(`⏱ Starting escalation timer for ${conversationId}`);
 
     const timer = setTimeout(async () => {
         try {
@@ -31,27 +31,42 @@ const startEscalationTimer = (conversationId, installId) => {
 
             console.log(`🤖 Escalating conversation ${conversationId} to AI`);
 
-            // Generate AI reply
-            const aiReply = await generateReply(conversationId, installId, lastMsg.text);
+            const messageToAnswer = visitorMessage || lastMsg.text;
 
-            // Save AI message to Firebase
+            // Generate AI reply
+            const { reply, understood, triggerForm } = await generateReply(conversationId, installId, messageToAnswer);
+
+            // Push AI reply FIRST so it appears before the form
             await db.ref(`messages/${conversationId}`).push({
                 sender: 'ai',
-                text: aiReply,
+                text: reply,
                 timestamp: Date.now(),
                 read: false,
             });
 
+            // Set formRequested AFTER reply is pushed — widget renders form below message
+            if (triggerForm) {
+                await db.ref(`conversations/${installId}/${conversationId}`).update({
+                    formRequested: true,
+                    formRequestedBy: 'ai',
+                });
+            }
+
             // Update conversation status
             await db.ref(`conversations/${installId}/${conversationId}`).update({
-                status: 'ai_handling',
                 lastMessageAt: Date.now(),
+                status: understood ? 'ai_handling' : 'waiting',
             });
 
-            // Add system message
+            const systemText = understood
+                ? '🤖 AI assistant answered this conversation.'
+                : triggerForm
+                    ? '🤖 AI couldn\'t answer — lead form sent to visitor & agent notified.'
+                    : '🤖 AI responded (greeting/vague message — no form triggered yet).';
+
             await db.ref(`messages/${conversationId}`).push({
                 sender: 'system',
-                text: 'AI assistant stepped in after 20 minutes of inactivity.',
+                text: systemText,
                 timestamp: Date.now() + 1,
                 read: false,
             });

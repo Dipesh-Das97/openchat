@@ -5,43 +5,60 @@ const verifyAgent = require('../middleware/verifyAgent');
 
 // ─── Save Settings ────────────────────────────
 router.put('/settings', verifyAgent, async (req, res) => {
-  const { mode, botConfig, workingHours, leadFields, welcomeMessage, onboardingComplete, profile } = req.body;
+    const {
+        profile,
+        features,
+        leadFields,
+        aiConfig,
+        workingHours,
+        appearance,
+        onboardingComplete,
+    } = req.body;
 
-  try {
-    const updates = {};
+    try {
+        const updates = {};
 
-    // Profile update
-    if (profile) {
-      // Get existing profile first to merge
-      const snap = await db.ref(`users/${req.agent.installId}/profile`).once('value');
-      const existingProfile = snap.val() || {};
-      updates['profile'] = { ...existingProfile, ...profile };
+        // Profile — merge with existing
+        if (profile) {
+            const snap = await db.ref(`users/${req.agent.installId}/profile`).once('value');
+            const existingProfile = snap.val() || {};
+            updates['profile'] = { ...existingProfile, ...profile };
+        }
+
+        // Feature toggles
+        if (features !== undefined) updates['features'] = features;
+
+        // Lead form config
+        if (leadFields !== undefined) updates['leadFields'] = leadFields || null;
+
+        // AI config
+        if (aiConfig !== undefined) updates['aiConfig'] = aiConfig || null;
+
+        // Working hours
+        if (workingHours !== undefined) updates['workingHours'] = workingHours || null;
+
+        // Widget appearance
+        if (appearance !== undefined) updates['appearance'] = appearance || null;
+
+        // Onboarding complete flag
+        if (onboardingComplete !== undefined) updates['onboardingComplete'] = onboardingComplete;
+
+        await db.ref(`users/${req.agent.installId}`).update(updates);
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    // Onboarding settings
-    if (mode !== undefined) updates['mode'] = mode;
-    if (welcomeMessage !== undefined) updates['welcomeMessage'] = welcomeMessage;
-    if (onboardingComplete !== undefined) updates['onboardingComplete'] = onboardingComplete;
-    if (botConfig !== undefined) updates['botConfig'] = botConfig || null;
-    if (workingHours !== undefined) updates['workingHours'] = workingHours || null;
-    if (leadFields !== undefined) updates['leadFields'] = leadFields || null;
-
-    await db.ref(`users/${req.agent.installId}`).update(updates);
-
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ─── Get Settings ─────────────────────────────
 router.get('/settings', verifyAgent, async (req, res) => {
-  try {
-    const snap = await db.ref(`users/${req.agent.installId}`).once('value');
-    res.json(snap.val());
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    try {
+        const snap = await db.ref(`users/${req.agent.installId}`).once('value');
+        res.json(snap.val());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;

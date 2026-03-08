@@ -2,37 +2,38 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../firebase');
 const verifyAgent = require('../middleware/verifyAgent');
-const { startEscalationTimer, cancelEscalationTimer } = require('../services/timerService');
 
 // ─── Get All Conversations ────────────────────
 router.get('/', verifyAgent, async (req, res) => {
-  try {
-    const snap = await db
-      .ref(`conversations/${req.agent.installId}`)
-      .orderByChild('lastMessageAt')
-      .once('value');
-    res.json(snap.val() || {});
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    try {
+        const snap = await db
+            .ref(`conversations/${req.agent.installId}`)
+            .orderByChild('lastMessageAt')
+            .once('value');
+        res.json(snap.val() || {});
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ─── Update Conversation Status ───────────────
 router.put('/:conversationId/status', verifyAgent, async (req, res) => {
-  const { conversationId } = req.params;
-  const { status } = req.body;
+    const { conversationId } = req.params;
+    const { status } = req.body;
 
-  try {
-    await db
-      .ref(`conversations/${req.agent.installId}/${conversationId}`)
-      .update({ status });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    try {
+        await db
+            .ref(`conversations/${req.agent.installId}/${conversationId}`)
+            .update({ status });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// After saving a message, check if bot mode and start timer
+// ─── Save Message ─────────────────────────────
+// Note: Timer/AI logic is handled entirely by botwatcher.js
+// This route only saves the message and updates conversation metadata
 router.post('/:conversationId/messages', async (req, res) => {
     const { conversationId } = req.params;
     const { installId, text, sender } = req.body;
@@ -46,24 +47,16 @@ router.post('/:conversationId/messages', async (req, res) => {
             read: false,
         });
 
-        // Update conversation
+        // Update conversation metadata
         const updates = { lastMessageAt: Date.now() };
-        if (sender === 'visitor') updates.status = 'waiting';
-        else if (sender === 'agent') updates.status = 'open';
-        await db.ref(`conversations/${installId}/${conversationId}`).update(updates);
-
-        // Bot mode logic
         if (sender === 'visitor') {
-            const settingsSnap = await db.ref(`users/${installId}`).once('value');
-            const settings = settingsSnap.val();
-
-            if (settings?.mode === 'chat_bot') {
-                startEscalationTimer(conversationId, installId);
-            }
+            updates.status = 'waiting';
+            updates.lastVisitorMessageAt = Date.now();
         } else if (sender === 'agent') {
-            // Agent replied → cancel timer
-            cancelEscalationTimer(conversationId);
+            updates.status = 'open';
         }
+
+        await db.ref(`conversations/${installId}/${conversationId}`).update(updates);
 
         res.json({ success: true });
     } catch (err) {

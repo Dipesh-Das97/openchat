@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ref, onChildAdded, push, set, update } from 'firebase/database';
+import { ref, onChildAdded, push, set, update, get, onDisconnect, onValue } from 'firebase/database';
 import { db } from '../firebase';
 
 const formatTime = (timestamp) => {
@@ -14,32 +14,58 @@ export default function ChatPanel({ conversationId, installId, token }) {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [formSent, setFormSent] = useState(false);
     const bottomRef = useRef(null);
     const listenedRef = useRef(null);
+
+    const [leadExists, setLeadExists] = useState(false);
+
+    // Reactively watch if lead already collected for this conversation
+    useEffect(() => {
+        if (!conversationId || !installId) return;
+        const unsub = onValue(ref(db, `conversations/${installId}/${conversationId}/leadCollected`), (snap) => {
+            setLeadExists(snap.val() === true);
+        });
+        return () => unsub();
+    }, [conversationId]);
 
     // Load messages when conversation changes
     useEffect(() => {
         if (!conversationId) return;
-        if (listenedRef.current === conversationId) return;
 
-        listenedRef.current = conversationId;
         setMessages([]);
+        listenedRef.current = conversationId;
 
         const msgRef = ref(db, `messages/${conversationId}`);
-        onChildAdded(msgRef, (snap) => {
+        const unsub = onChildAdded(msgRef, (snap) => {
             const msg = { id: snap.key, ...snap.val() };
             setMessages((prev) => {
-                // Prevent duplicates
                 if (prev.find((m) => m.id === msg.id)) return prev;
                 return [...prev, msg];
             });
         });
+
+        return () => unsub();
     }, [conversationId]);
 
     // Auto scroll to bottom
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // ── Auto set agent online when they send a message ─────
+    const ensureAgentOnline = async () => {
+        const presRef = ref(db, `agentPresence/${installId}`);
+        const snap = await get(presRef);
+        const isCurrentlyOnline = snap.val()?.online === true;
+
+        if (!isCurrentlyOnline) {
+            await set(presRef, { online: true, lastSeen: Date.now() });
+            // Auto set offline when tab closes
+            onDisconnect(presRef).set({ online: false, lastSeen: Date.now() });
+            console.log(`🟢 Agent auto-set online for ${installId}`);
+        }
+    };
 
     const handleSend = async () => {
         const text = input.trim();
@@ -49,6 +75,9 @@ export default function ChatPanel({ conversationId, installId, token }) {
         setLoading(true);
 
         try {
+            // Auto set agent online if they're currently offline
+            await ensureAgentOnline();
+
             await push(ref(db, `messages/${conversationId}`), {
                 sender: 'agent',
                 text,
@@ -56,7 +85,6 @@ export default function ChatPanel({ conversationId, installId, token }) {
                 read: false,
             });
 
-            // Update lastMessageAt + set status back to open
             await update(
                 ref(db, `conversations/${installId}/${conversationId}`),
                 {
@@ -68,6 +96,37 @@ export default function ChatPanel({ conversationId, installId, token }) {
             console.error('Failed to send message:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Reset on conversation change
+    useEffect(() => {
+        setFormSent(false);
+        setLeadExists(false);
+    }, [conversationId]);
+
+    const handleSendForm = async () => {
+        if (formSent) return;
+
+        try {
+            // Agent-triggered — always send regardless of prior lead collection
+            await update(
+                ref(db, `conversations/${installId}/${conversationId}`),
+                {
+                    formRequested: true,
+                    formRequestedBy: 'agent', // widget always shows form when agent sends
+                }
+            );
+
+            await push(ref(db, `messages/${conversationId}`), {
+                sender: 'system',
+                text: '📋 Lead form sent to visitor.',
+                timestamp: Date.now(),
+            });
+
+            setFormSent(true);
+        } catch (err) {
+            console.error('Failed to send form:', err);
         }
     };
 
@@ -91,11 +150,10 @@ export default function ChatPanel({ conversationId, installId, token }) {
                     <div style={styles.noMessages}>No messages yet.</div>
                 )}
                 {messages.map((msg) => {
-                    // System message — centered banner
                     if (msg.sender === 'system') {
                         return (
                             <div key={msg.id} style={styles.systemMessage}>
-                                🤖 {msg.text}
+                                {msg.text}
                             </div>
                         );
                     }
@@ -112,9 +170,7 @@ export default function ChatPanel({ conversationId, installId, token }) {
                                 justifyContent: isVisitor ? 'flex-start' : 'flex-end',
                             }}
                         >
-                            {isVisitor && (
-                                <div style={styles.avatarSmall}>V</div>
-                            )}
+                            {isVisitor && <div style={styles.avatarSmall}>V</div>}
                             <div style={{
                                 ...styles.bubble,
                                 backgroundColor: isVisitor ? '#fff' : isAI ? '#7C3AED' : '#4F46E5',
@@ -123,9 +179,7 @@ export default function ChatPanel({ conversationId, installId, token }) {
                                 borderBottomRightRadius: !isVisitor ? '4px' : '12px',
                                 borderBottomLeftRadius: isVisitor ? '4px' : '12px',
                             }}>
-                                {isAI && (
-                                    <span style={styles.aiBadge}>AI</span>
-                                )}
+                                {isAI && <span style={styles.aiBadge}>AI</span>}
                                 <p style={styles.bubbleText}>{msg.text}</p>
                                 <p style={styles.bubbleTime}>{formatTime(msg.timestamp)}</p>
                             </div>
@@ -144,8 +198,30 @@ export default function ChatPanel({ conversationId, installId, token }) {
                 <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
+            {/* Input Area */}
             <div style={styles.inputArea}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
+                    {leadExists && (
+                        <span style={{ fontSize: '10px', color: '#F59E0B', fontWeight: '600', textAlign: 'center' }}>
+                            ⚠️ Lead collected
+                        </span>
+                    )}
+                    <button
+                        style={{
+                            ...styles.formBtn,
+                            opacity: formSent ? 0.5 : 1,
+                            cursor: formSent ? 'not-allowed' : 'pointer',
+                            backgroundColor: formSent ? '#E5E7EB' : '#EEF2FF',
+                            color: formSent ? '#9CA3AF' : '#4F46E5',
+                        }}
+                        onClick={handleSendForm}
+                        disabled={formSent}
+                        title={leadExists ? 'Lead already collected — send again?' : 'Send lead form to visitor'}
+                    >
+                        {formSent ? '✅ Form Sent' : '📋 Send Form'}
+                    </button>
+                </div>
+
                 <input
                     style={styles.input}
                     type="text"
@@ -191,9 +267,7 @@ const styles = {
         alignItems: 'center',
         gap: '10px',
     },
-    headerAvatar: {
-        fontSize: '24px',
-    },
+    headerAvatar: { fontSize: '24px' },
     headerTitle: {
         fontSize: '15px',
         fontWeight: '700',
@@ -255,11 +329,22 @@ const styles = {
         textAlign: 'right',
     },
     inputArea: {
-        padding: '16px',
+        padding: '12px 16px',
         backgroundColor: '#fff',
         borderTop: '1px solid #E5E7EB',
         display: 'flex',
         gap: '8px',
+        alignItems: 'center',
+    },
+    formBtn: {
+        padding: '8px 12px',
+        borderRadius: '20px',
+        border: '1px solid #C7D2FE',
+        fontSize: '12px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
     },
     input: {
         flex: 1,

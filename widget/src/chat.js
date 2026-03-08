@@ -16,12 +16,12 @@ export const getOrCreateConversation = async (installId, visitorName, visitorEma
   let conversationId = localStorage.getItem(`oc_conversation_${installId}`);
 
   if (conversationId) {
-    // Verify it still exists
     const snap = await get(ref(db, `conversations/${installId}/${conversationId}`));
     if (snap.exists()) return conversationId;
   }
 
-  // Create new conversation
+  // New conversation — explicitly set formRequested: false so widget listener
+  // never gets a stale true value from a previous conversation
   const newRef = await push(ref(db, `conversations/${installId}`), {
     visitorId: getVisitorId(),
     visitorName: visitorName || 'Visitor',
@@ -29,7 +29,10 @@ export const getOrCreateConversation = async (installId, visitorName, visitorEma
     status: 'open',
     createdAt: Date.now(),
     lastMessageAt: Date.now(),
+    lastSenderWasVisitor: false,
+    lastMessagePreview: '',
     collectedEmail: !!visitorEmail,
+    formRequested: false, // ← always start clean
   });
 
   conversationId = newRef.key;
@@ -39,19 +42,29 @@ export const getOrCreateConversation = async (installId, visitorName, visitorEma
 
 // Send a message
 export const sendMessage = async (conversationId, installId, text, sender = 'visitor') => {
-    const db = getDb();
-    await push(ref(db, `messages/${conversationId}`), {
-        sender,
-        text,
-        timestamp: Date.now(),
-        read: false,
-    });
+  const db = getDb();
 
-    const updates = { lastMessageAt: Date.now() };
-    if (sender === 'visitor') updates.status = 'waiting';
-    else if (sender === 'agent') updates.status = 'open';
+  await push(ref(db, `messages/${conversationId}`), {
+    sender,
+    text,
+    timestamp: Date.now(),
+    read: false,
+  });
 
-    await update(ref(db, `conversations/${installId}/${conversationId}`), updates);
+  const updates = {
+    lastMessageAt: Date.now(),
+    lastSenderWasVisitor: sender === 'visitor',
+    lastMessagePreview: text.slice(0, 60),
+  };
+
+  if (sender === 'visitor') {
+    updates.status = 'waiting';
+    updates.lastVisitorMessageAt = Date.now();
+  } else if (sender === 'agent') {
+    updates.status = 'open';
+  }
+
+  await update(ref(db, `conversations/${installId}/${conversationId}`), updates);
 };
 
 // Listen to new messages
@@ -78,16 +91,34 @@ export const getAgentSettings = async (installId) => {
 };
 
 export const saveLead = async (installId, leadData) => {
-    const db = getDb();
+  const db = getDb();
+  const conversationId = localStorage.getItem(`oc_conversation_${installId}`);
 
-    // Remove undefined values — Firebase rejects them
-    const cleanData = Object.fromEntries(
-        Object.entries(leadData).filter(([_, v]) => v !== undefined && v !== null && v !== '')
-    );
+  const cleanData = Object.fromEntries(
+    Object.entries(leadData).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+  );
 
-    await push(ref(db, `leads/${installId}`), {
-        ...cleanData,
-        timestamp: Date.now(),
-        visitorId: getVisitorId(),
+  await push(ref(db, `leads/${installId}`), {
+    ...cleanData,
+    timestamp: Date.now(),
+    visitorId: getVisitorId(),
+  });
+
+  if (conversationId) {
+    // System message — shows in agent chat so they know form was submitted
+    await push(ref(db, `messages/${conversationId}`), {
+      sender: 'system',
+      text: `✅ Visitor submitted the lead form${cleanData.name ? ` (${cleanData.name})` : ''}.`,
+      timestamp: Date.now(),
     });
+
+    // Mark lead collected + trigger notification in dashboard
+    await update(ref(db, `conversations/${installId}/${conversationId}`), {
+      leadCollected: true,
+      formRequested: false,
+      formRequestedBy: null,
+      lastVisitorMessageAt: Date.now(),
+      lastMessagePreview: `📋 Lead form submitted${cleanData.name ? ` by ${cleanData.name}` : ''}`,
+    });
+  }
 };

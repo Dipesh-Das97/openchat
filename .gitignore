@@ -62,3 +62,9 @@ server/serviceAccount.json
 
 # --- Dashboard ------
 dashboard/.env
+
+# Deployment
+server/env.yaml
+dashboard/.env.production
+dashboard/.env
+server/.env

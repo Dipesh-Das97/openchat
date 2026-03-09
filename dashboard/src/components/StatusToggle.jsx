@@ -3,86 +3,76 @@ import { db } from '../firebase';
 
 export default function StatusToggle({ installId, isOnline, setIsOnline }) {
 
-    const handleToggle = async () => {
-        const presRef = ref(db, `agentPresence/${installId}`);
+  const handleToggle = async () => {
+    const presRef = ref(db, `agentPresence/${installId}`);
+    if (!isOnline) {
+      await set(presRef, { online: true, lastSeen: Date.now() });
+      onDisconnect(presRef).set({ online: false, lastSeen: Date.now() });
+    } else {
+      await set(presRef, { online: false, lastSeen: Date.now() });
+    }
+    setIsOnline(!isOnline);
+  };
 
-        if (!isOnline) {
-            // Going online
-            await set(presRef, { online: true, lastSeen: Date.now() });
+  return (
+    <div onClick={handleToggle} style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      cursor: 'pointer', userSelect: 'none',
+      padding: '7px 12px', borderRadius: '20px',
+      backgroundColor: isOnline ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${isOnline ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.09)'}`,
+      transition: 'all 0.2s',
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+    }}>
 
-            // Auto set offline when tab closes
-            onDisconnect(presRef).set({ online: false, lastSeen: Date.now() });
-        } else {
-            // Going offline manually
-            await set(presRef, { online: false, lastSeen: Date.now() });
+      {/* Pulsing dot */}
+      <div style={{ position: 'relative', width: '8px', height: '8px', flexShrink: 0 }}>
+        <div style={{
+          width: '8px', height: '8px', borderRadius: '50%',
+          backgroundColor: isOnline ? '#34D399' : '#3A3A52',
+          transition: 'background-color 0.2s',
+        }} />
+        {isOnline && (
+          <div style={{
+            position: 'absolute', inset: '-3px', borderRadius: '50%',
+            backgroundColor: 'rgba(52,211,153,0.25)',
+            animation: 'statusPulse 2s ease-in-out infinite',
+          }} />
+        )}
+      </div>
+
+      <span style={{
+        fontSize: '12px', fontWeight: '700',
+        color: isOnline ? '#34D399' : '#3A3A52',
+        transition: 'color 0.2s',
+        letterSpacing: '0.03em',
+      }}>
+        {isOnline ? 'Online' : 'Offline'}
+      </span>
+
+      {/* Toggle pill */}
+      <div style={{
+        width: '36px', height: '20px', borderRadius: '10px', position: 'relative',
+        backgroundColor: isOnline ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.08)',
+        border: `1px solid ${isOnline ? 'rgba(52,211,153,0.5)' : 'rgba(255,255,255,0.1)'}`,
+        flexShrink: 0, transition: 'all 0.2s',
+      }}>
+        <div style={{
+          position: 'absolute', top: '2px',
+          width: '14px', height: '14px', borderRadius: '50%',
+          backgroundColor: isOnline ? '#34D399' : '#3A3A52',
+          boxShadow: isOnline ? '0 0 6px rgba(52,211,153,0.5)' : 'none',
+          transition: 'transform 0.2s, background-color 0.2s, box-shadow 0.2s',
+          transform: isOnline ? 'translateX(18px)' : 'translateX(2px)',
+        }} />
+      </div>
+
+      <style>{`
+        @keyframes statusPulse {
+          0%, 100% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.6); opacity: 0; }
         }
-
-        setIsOnline(!isOnline);
-    };
-
-    return (
-        <div style={styles.container} onClick={handleToggle}>
-            <div style={{
-                ...styles.dot,
-                backgroundColor: isOnline ? '#4ADE80' : '#D1D5DB',
-            }} />
-            <span style={styles.label}>
-                {isOnline ? 'Online' : 'Offline'}
-            </span>
-            <div style={{
-                ...styles.toggle,
-                backgroundColor: isOnline ? '#4F46E5' : '#E5E7EB',
-            }}>
-                <div style={{
-                    ...styles.thumb,
-                    transform: isOnline ? 'translateX(18px)' : 'translateX(2px)',
-                }} />
-            </div>
-        </div>
-    );
+      `}</style>
+    </div>
+  );
 }
-
-const styles = {
-    container: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        cursor: 'pointer',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        border: '1px solid #E5E7EB',
-        backgroundColor: '#F9FAFB',
-        userSelect: 'none',
-    },
-    dot: {
-        width: '8px',
-        height: '8px',
-        borderRadius: '50%',
-        flexShrink: 0,
-        transition: 'background-color 0.2s',
-    },
-    label: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#374151',
-        flex: 1,
-    },
-    toggle: {
-        width: '40px',
-        height: '22px',
-        borderRadius: '11px',
-        position: 'relative',
-        transition: 'background-color 0.2s',
-        flexShrink: 0,
-    },
-    thumb: {
-        position: 'absolute',
-        top: '3px',
-        width: '16px',
-        height: '16px',
-        borderRadius: '50%',
-        backgroundColor: '#fff',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-        transition: 'transform 0.2s',
-    },
-};

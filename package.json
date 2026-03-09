@@ -12,5 +12,8 @@
     "server": "yarn workspace server dev",
     "dashboard": "yarn workspace dashboard dev",
     "widget": "yarn workspace widget build"
+  },
+  "dependencies": {
+    "lucide-react": "^0.577.0"
   }
 }

@@ -4080,6 +4080,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lucide-react@npm:^0.577.0":
+  version: 0.577.0
+  resolution: "lucide-react@npm:0.577.0"
+  peerDependencies:
+    react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: f39db5fb91e925480c9d697f4fc2474d692abcda8e069a5be3295ce9c370dbf7fb55a6b88f94ab5d8b2f834bb76407926b312e2f88992aad62e7567efeb87dcc
+  languageName: node
+  linkType: hard
+
 "make-fetch-happen@npm:^15.0.0":
   version: 15.0.4
   resolution: "make-fetch-happen@npm:15.0.4"
@@ -4447,6 +4456,8 @@ __metadata:
 "openchat@workspace:.":
   version: 0.0.0-use.local
   resolution: "openchat@workspace:."
+  dependencies:
+    lucide-react: ^0.577.0
   languageName: unknown
   linkType: soft
 

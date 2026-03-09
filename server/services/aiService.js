@@ -61,6 +61,56 @@ const notifyAgent = async (installId, conversationId, visitorMessage) => {
     }
 };
 
+// ── Gemini API call ────────────────────────────────────────
+const askGemini = async (systemPrompt, userMessage) => {
+    const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: `${systemPrompt}\n\nVisitor message: "${userMessage}"` }],
+                    },
+                ],
+                generationConfig: {
+                    temperature: 0.4,
+                    maxOutputTokens: 300,
+                },
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Gemini API error: ${err}`);
+    }
+
+    const data = await response.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+};
+
+// ── Build system prompt from KB ────────────────────────────
+const buildSystemPrompt = (companyName, knowledgeBase) => {
+    const kbText = knowledgeBase.length > 0
+        ? knowledgeBase.map((k, i) => `Q${i + 1}: ${k.question}\nA${i + 1}: ${k.answer}`).join('\n\n')
+        : 'No knowledge base entries available.';
+
+    return `You are a helpful, friendly live chat assistant for ${companyName}.
+
+Your job is to answer visitor questions using ONLY the knowledge base below.
+Be concise, warm, and conversational. Keep replies under 3 sentences.
+Do not make up information that isn't in the knowledge base.
+
+If the visitor's question cannot be answered from the knowledge base, reply with exactly this text and nothing else:
+CANNOT_ANSWER
+
+Knowledge Base:
+${kbText}`;
+};
+
 // ── Main reply generator ───────────────────────────────────
 const generateReply = async (conversationId, installId, visitorMessage) => {
     try {
@@ -70,10 +120,8 @@ const generateReply = async (conversationId, installId, visitorMessage) => {
         ]);
 
         const companyName = settings?.appearance?.companyName || settings?.profile?.company || 'us';
-        const fallbackMessage = settings?.aiConfig?.fallbackMessage ||
-            "I don't have information on that. Our team will get back to you shortly.";
 
-        // ── Step 1: Greeting → respond warmly, ask what they need ──
+        // ── Step 1: Greeting → respond warmly ─────────────────────
         if (isGreeting(visitorMessage)) {
             return {
                 reply: `Hey there! 👋 No agents are available right now, but I'm here to help. What can I assist you with today?`,
@@ -87,37 +135,24 @@ const generateReply = async (conversationId, installId, visitorMessage) => {
             return {
                 reply: `Could you tell me a bit more about what you need help with? I'll do my best to assist! 😊`,
                 understood: true,
-                isGreeting: true, // treat same as greeting — don't trigger form yet
+                isGreeting: true,
             };
         }
 
-        // ── Step 3: Check KB for a match ───────────────────────────
-        const lowerMsg = visitorMessage.toLowerCase();
-        const match = knowledgeBase.find((k) => {
-            const lowerQ = k.question.toLowerCase();
+        // ── Step 3: Ask Gemini using KB as context ─────────────────
+        const systemPrompt = buildSystemPrompt(companyName, knowledgeBase);
+        const geminiReply = await askGemini(systemPrompt, visitorMessage);
 
-            // Full question contained in message
-            if (lowerMsg.includes(lowerQ)) return true;
-
-            // Keyword match — only use words 5+ chars to avoid noise words
-            // like "for", "what", "about", "with", etc.
-            // Also require ALL meaningful keywords to match (not just some)
-            const keywords = lowerQ.split(' ').filter((w) => w.length >= 5);
-            if (keywords.length === 0) return false;
-
-            // Every meaningful keyword must appear in the message
-            return keywords.every((kw) => lowerMsg.includes(kw));
-        });
-
-        if (match) {
-            // KB match found — answer and keep conversation going
-            return { reply: match.answer, understood: true };
+        // Gemini answered from KB
+        if (geminiReply && geminiReply !== 'CANNOT_ANSWER') {
+            console.log(`🤖 Gemini answered for ${installId}`);
+            return { reply: geminiReply, understood: true };
         }
 
-        // ── Step 4: No KB match → warm handoff message + trigger form ──
-        console.log(`🤖 AI couldn't answer for ${installId}, triggering form...`);
+        // ── Step 4: Gemini couldn't answer → warm handoff + form ───
+        console.log(`🤖 Gemini couldn't answer for ${installId}, triggering form...`);
 
-        // System message for agent's view
+        // System message for agent view
         await db.ref(`messages/${conversationId}`).push({
             sender: 'system',
             text: `🤖 AI couldn't answer: "${visitorMessage}" — lead form sent to visitor.`,
@@ -127,18 +162,17 @@ const generateReply = async (conversationId, installId, visitorMessage) => {
         // Notify agent by email
         await notifyAgent(installId, conversationId, visitorMessage);
 
-        // Return triggerForm flag — caller (botwatcher/timerService) will set
-        // formRequested AFTER pushing the reply message so form appears after message
         return {
-            reply: `I don't have a great answer for that right now. 😔 Let me get one of our team members to follow up with you — could you leave your details below and we'll get back to you shortly!`,
+            reply: `I don't have a great answer for that right now. 😔 Let me get one of our team members to follow up — could you leave your details below and we'll get back to you shortly!`,
             understood: false,
             triggerForm: true,
         };
 
     } catch (err) {
         console.error('AI service error:', err);
+        // Graceful fallback — don't crash the chat
         return {
-            reply: 'Our team will get back to you shortly.',
+            reply: `I'm having a little trouble right now. Our team will get back to you shortly! 🙏`,
             understood: false,
         };
     }

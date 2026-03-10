@@ -20,8 +20,6 @@ export const getOrCreateConversation = async (installId, visitorName, visitorEma
     if (snap.exists()) return conversationId;
   }
 
-  // New conversation — explicitly set formRequested: false so widget listener
-  // never gets a stale true value from a previous conversation
   const newRef = await push(ref(db, `conversations/${installId}`), {
     visitorId: getVisitorId(),
     visitorName: visitorName || 'Visitor',
@@ -32,12 +30,29 @@ export const getOrCreateConversation = async (installId, visitorName, visitorEma
     lastSenderWasVisitor: false,
     lastMessagePreview: '',
     collectedEmail: !!visitorEmail,
-    formRequested: false, // ← always start clean
+    formRequested: false,
   });
 
   conversationId = newRef.key;
   localStorage.setItem(`oc_conversation_${installId}`, conversationId);
   return conversationId;
+};
+
+// ── Write notification ────────────────────────────────────
+const writeNotification = async (installId, type, message, subtext, conversationId = null) => {
+  const db = getDb();
+  try {
+    await push(ref(db, `notifications/${installId}`), {
+      type,
+      message,
+      subtext: subtext?.substring(0, 80) || '',
+      conversationId,
+      read: false,
+      timestamp: Date.now(),
+    });
+  } catch (e) {
+    console.warn('Notification write failed:', e);
+  }
 };
 
 // Send a message
@@ -65,6 +80,24 @@ export const sendMessage = async (conversationId, installId, text, sender = 'vis
   }
 
   await update(ref(db, `conversations/${installId}/${conversationId}`), updates);
+
+  // ── Notification for visitor messages only ─────────────
+  if (sender === 'visitor') {
+    const convSnap = await get(ref(db, `conversations/${installId}/${conversationId}`));
+    const conv = convSnap.val();
+    const visitorName = conv?.visitorName || 'A visitor';
+    const isReturning = conv?.messageCount > 1;
+
+    await writeNotification(
+      installId,
+      isReturning ? 'return' : 'message',
+      isReturning
+        ? `${visitorName} returned to a conversation`
+        : `New message from ${visitorName}`,
+      text,
+      conversationId
+    );
+  }
 };
 
 // Listen to new messages
@@ -105,14 +138,12 @@ export const saveLead = async (installId, leadData) => {
   });
 
   if (conversationId) {
-    // System message — shows in agent chat so they know form was submitted
     await push(ref(db, `messages/${conversationId}`), {
       sender: 'system',
       text: `✅ Visitor submitted the lead form${cleanData.name ? ` (${cleanData.name})` : ''}.`,
       timestamp: Date.now(),
     });
 
-    // Mark lead collected + trigger notification in dashboard
     await update(ref(db, `conversations/${installId}/${conversationId}`), {
       leadCollected: true,
       formRequested: false,
@@ -120,5 +151,14 @@ export const saveLead = async (installId, leadData) => {
       lastVisitorMessageAt: Date.now(),
       lastMessagePreview: `📋 Lead form submitted${cleanData.name ? ` by ${cleanData.name}` : ''}`,
     });
+
+    // ── Notification for lead submission ──────────────────
+    await writeNotification(
+      installId,
+      'lead',
+      `New lead from ${cleanData.name || 'a visitor'}`,
+      cleanData.email || cleanData.phone || '',
+      conversationId
+    );
   }
 };

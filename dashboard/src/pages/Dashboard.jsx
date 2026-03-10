@@ -10,6 +10,7 @@ import StatusToggle from "../components/StatusToggle";
 import Settings from "./Settings";
 import Docs from "./Docs";
 import Leads from "./Leads";
+import Notifications from "./Notifications";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useNotifications } from "../hooks/useNotifications";
 import {
@@ -21,6 +22,7 @@ import {
   MessageCircle,
   Code2,
   Settings2,
+  Bell,
   Wrench,
   Zap,
   LogOut,
@@ -111,6 +113,23 @@ function useDashboardStyles() {
 
       /* Range btn */
       .dash-range-btn:hover { background-color: rgba(255,255,255,0.06) !important; }
+      /* Notification badge */
+      .dash-notif-badge {
+        position: absolute; top: 4px; right: 4px;
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #F87171; border: 2px solid #09090F;
+        box-shadow: 0 0 6px rgba(248,113,113,0.7);
+      }
+      .dash-notif-item:hover { background-color: rgba(255,255,255,0.04) !important; }
+      /* Notification badge */
+      .dash-notif-badge {
+        position: absolute; top: 4px; right: 4px;
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #F87171; border: 2px solid #09090F;
+        box-shadow: 0 0 6px rgba(248,113,113,0.7);
+      }
+      /* Notification item hover */
+      .dash-notif-item:hover { background-color: rgba(255,255,255,0.04) !important; }
     `;
     document.head.appendChild(el);
   }, []);
@@ -795,6 +814,7 @@ const NAV_ITEMS = [
   { view: "conversations", icon: <MessageCircle size={20} />, label: "Chats" },
   { view: "leads", icon: <ClipboardList size={20} />, label: "Leads" },
   { view: "docs", icon: <Code2 size={20} />, label: "Docs" },
+  { view: "notifications", icon: <Bell size={20} />, label: "Alerts" },
   { view: "settings", icon: <Settings2 size={20} />, label: "Settings" },
 ];
 
@@ -812,6 +832,7 @@ export default function Dashboard() {
   const [isOnline, setIsOnline] = useState(false);
   const [view, setView] = useState("home");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const prevConversationsRef = useRef({});
   const notifyRef = useRef(notify);
@@ -827,7 +848,7 @@ export default function Dashboard() {
     if (!token || !installId) return;
     requestPermission();
     rehydrateFirebase();
-    fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+    fetch("http://localhost:5000/api/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -880,6 +901,20 @@ export default function Dashboard() {
     if (!installId) return;
     const unsub = onValue(ref(db, `agentPresence/${installId}`), (snap) => {
       setIsOnline(snap.val()?.online || false);
+    });
+    return () => unsub();
+  }, [installId]);
+
+  // ── Notifications unread count ─────────────────────────
+  useEffect(() => {
+    if (!installId) return;
+    const unsub = onValue(ref(db, `notifications/${installId}`), (snap) => {
+      if (!snap.exists()) {
+        setUnreadCount(0);
+        return;
+      }
+      const count = Object.values(snap.val()).filter((n) => !n.read).length;
+      setUnreadCount(count);
     });
     return () => unsub();
   }, [installId]);
@@ -938,9 +973,14 @@ export default function Dashboard() {
             <div style={s.mobilePage}>
               <div style={s.mobileHeader}>
                 <div
-                  style={{ display: "flex", alignItems: "center", gap: "10px", height: "20px" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    height: "20px",
+                  }}
                 >
-                 💬
+                  💬
                 </div>
               </div>
               <div style={{ overflowY: "auto", flex: 1 }}>
@@ -1016,6 +1056,13 @@ export default function Dashboard() {
           {view === "settings" && (
             <Settings installId={installId} token={token} agent={agent} />
           )}
+          {view === "notifications" && (
+            <Notifications
+              installId={installId}
+              setView={setView}
+              setSelectedId={setSelectedId}
+            />
+          )}
         </div>
 
         {/* Bottom Nav */}
@@ -1039,9 +1086,26 @@ export default function Dashboard() {
               >
                 <span
                   className="dash-bnav-icon"
-                  style={{ color: isActive ? "#C8F135" : "#3A3A52" }}
+                  style={{
+                    color: isActive ? "#C8F135" : "#3A3A52",
+                    position: "relative",
+                  }}
                 >
                   {item.icon}
+                  {item.view === "notifications" && unreadCount > 0 && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: -2,
+                        right: -2,
+                        width: "7px",
+                        height: "7px",
+                        borderRadius: "50%",
+                        background: "#F87171",
+                        border: "2px solid #09090F",
+                      }}
+                    />
+                  )}
                 </span>
                 <span
                   style={{
@@ -1078,9 +1142,7 @@ export default function Dashboard() {
       {/* Nav Rail */}
       <div style={s.navRail}>
         {/* Logo */}
-        <div style={s.navLogo}>
-          💬
-        </div>
+        <div style={s.navLogo}>💬</div>
 
         {/* Nav items */}
         <div style={s.navItems}>
@@ -1140,7 +1202,15 @@ export default function Dashboard() {
                 >
                   {item.icon}
                 </span>
-                <span className="dash-nav-tooltip">{item.label}</span>
+                {item.view === "notifications" && unreadCount > 0 && (
+                  <span className="dash-notif-badge" />
+                )}
+                <span className="dash-nav-tooltip">
+                  {item.label}
+                  {item.view === "notifications" && unreadCount > 0
+                    ? ` (${unreadCount})`
+                    : ""}
+                </span>
               </button>
             );
           })}
@@ -1177,6 +1247,13 @@ export default function Dashboard() {
       {view === "docs" && <Docs installId={installId} />}
       {view === "settings" && (
         <Settings installId={installId} token={token} agent={agent} />
+      )}
+      {view === "notifications" && (
+        <Notifications
+          installId={installId}
+          setView={setView}
+          setSelectedId={setSelectedId}
+        />
       )}
 
       {view === "conversations" && (
@@ -1256,7 +1333,7 @@ const s = {
     width: "38px",
     height: "38px",
     background:
-      "#C8F135",
+      "linear-gradient(135deg, rgba(200,241,53,0.2), rgba(200,241,53,0.05))",
     border: "1px solid rgba(200,241,53,0.3)",
     borderRadius: "12px",
     display: "flex",

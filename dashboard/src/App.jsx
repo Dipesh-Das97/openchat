@@ -11,11 +11,16 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" />;
 };
 
+const HomeRoute = () => {
+  const token = useAgentStore((state) => state.token);
+  return token ? <Navigate to="/dashboard" replace /> : <Landing />;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/setup" element={
@@ -28,7 +33,7 @@ function App() {
             <Dashboard />
           </ProtectedRoute>
         } />
-        <Route path="*" element={<Navigate to="/login" />} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   );

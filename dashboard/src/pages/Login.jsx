@@ -1,96 +1,292 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import useAgentStore from '../store/agentStore';
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  getAuth,
+  signInWithPopup,
+  GoogleAuthProvider,
+  GithubAuthProvider,
+} from "firebase/auth";
+import useAgentStore from "../store/agentStore";
 
-// ── Inject fonts ───────────────────────────────────────────
 function useFont() {
   useEffect(() => {
-    if (document.getElementById('auth-fonts')) return;
-    const link = document.createElement('link');
-    link.id = 'auth-fonts';
-    link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap';
+    if (document.getElementById("auth-fonts")) return;
+    const link = document.createElement("link");
+    link.id = "auth-fonts";
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap";
     document.head.appendChild(link);
   }, []);
 }
 
-// Spinner keyframe injected once
-function useSpinnerStyle() {
+function useAuthStyles() {
   useEffect(() => {
-    if (document.getElementById('auth-spin')) return;
-    const style = document.createElement('style');
-    style.id = 'auth-spin';
+    if (document.getElementById("auth-spin")) return;
+    const style = document.createElement("style");
+    style.id = "auth-spin";
     style.textContent = `
       @keyframes authSpin { to { transform: rotate(360deg); } }
       @keyframes authFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       .auth-card { animation: authFadeUp 0.5s ease both; }
+      .auth-input::placeholder { color: #3A3A52; }
+      .auth-social-btn { transition: all 0.2s ease !important; }
+      .auth-social-btn:hover { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.18) !important; transform: translateY(-1px); }
+      .auth-divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
     `;
     document.head.appendChild(style);
   }, []);
 }
+
+const GoogleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+    />
+  </svg>
+);
+
+const GitHubIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="#EDEAF5">
+    <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+  </svg>
+);
 
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAgentStore((state) => state.setAuth);
   const setAgent = useAgentStore((state) => state.setAgent);
   useFont();
-  useSpinnerStyle();
+  useAuthStyles();
 
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState('');
+  const [socialLoading, setSocialLoading] = useState("");
+  const [focused, setFocused] = useState("");
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState("");
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-  const handleKeyDown = (e) => { if (e.key === 'Enter') handleLogin(); };
+  const handleChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") handleLogin();
+  };
 
+  // ── Email / Password Login ─────────────────────────────
   const handleLogin = async () => {
-    setError('');
+    setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        },
+      );
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Login failed'); return; }
-
+      if (!res.ok) {
+        setError(data.error || "Login failed");
+        return;
+      }
       await setAuth(data.token, data.installId, data.firebaseToken);
-      const profileRes = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${data.token}` },
-      });
+      const profileRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/me`,
+        {
+          headers: { Authorization: `Bearer ${data.token}` },
+        },
+      );
       const profile = await profileRes.json();
       setAgent(profile);
-      navigate(profile.onboardingComplete ? '/dashboard' : '/setup');
+      navigate(profile.onboardingComplete ? "/dashboard" : "/setup");
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Social Login ───────────────────────────────────────
+  const handleSocialLogin = async (providerName) => {
+    setError("");
+    setSocialLoading(providerName);
+    try {
+      const auth = getAuth();
+      const provider =
+        providerName === "google"
+          ? new GoogleAuthProvider()
+          : new GithubAuthProvider();
+
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken();
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/social`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Social login failed");
+        return;
+      }
+
+      await setAuth(data.token, data.installId, data.firebaseToken);
+
+      if (data.isNewUser) {
+        navigate("/setup");
+      } else {
+        const profileRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/auth/me`,
+          {
+            headers: { Authorization: `Bearer ${data.token}` },
+          },
+        );
+        const profile = await profileRes.json();
+        setAgent(profile);
+        navigate(profile.onboardingComplete ? "/dashboard" : "/setup");
+      }
+    } catch (err) {
+      if (err.code === "auth/popup-closed-by-user") return;
+      if (err.code === "auth/account-exists-with-different-credential") {
+        setError(
+          "An account with this email already exists. Please sign in with email/password.",
+        );
+        return;
+      }
+      setError("Social login failed. Please try again.");
+    } finally {
+      setSocialLoading("");
+    }
+  };
+
+  // ── Forgot Password ────────────────────────────────────
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      setForgotSuccess("Check your inbox for a reset link.");
+    } catch {
+      setForgotSuccess("Check your inbox for a reset link.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const inputStyle = (name) => ({
     ...s.input,
-    borderColor: focused === name ? 'rgba(200,241,53,0.45)' : 'rgba(255,255,255,0.08)',
-    boxShadow: focused === name ? '0 0 0 3px rgba(200,241,53,0.07)' : 'none',
+    borderColor:
+      focused === name ? "rgba(200,241,53,0.45)" : "rgba(255,255,255,0.08)",
+    boxShadow: focused === name ? "0 0 0 3px rgba(200,241,53,0.07)" : "none",
   });
 
+  // ── Forgot Password Screen ─────────────────────────────
+  if (showForgot) {
+    return (
+      <div style={s.root}>
+        <div style={s.dotGrid} />
+        <div style={s.glow1} />
+        <div style={s.glow2} />
+        <div style={s.card} className="auth-card">
+          <div style={s.topLine} />
+          <div style={s.logoRow}>
+            <div style={s.logoMark}>💬</div>
+            <span style={s.logoText}>OpenChat</span>
+          </div>
+          <h1 style={s.title}>Reset password</h1>
+          <p style={s.subtitle}>We'll send a reset link to your email</p>
+          {forgotSuccess ? (
+            <div style={s.successBox}>
+              <span>✅</span> {forgotSuccess}
+            </div>
+          ) : null}
+          <div style={s.field}>
+            <label style={s.label}>Email address</label>
+            <input
+              style={inputStyle("forgotEmail")}
+              type="email"
+              placeholder="you@example.com"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              onFocus={() => setFocused("forgotEmail")}
+              onBlur={() => setFocused("")}
+              onKeyDown={(e) => e.key === "Enter" && handleForgotPassword()}
+              autoComplete="email"
+            />
+          </div>
+          <button
+            style={{ ...s.btn, opacity: forgotLoading ? 0.75 : 1 }}
+            onClick={handleForgotPassword}
+            disabled={forgotLoading || !!forgotSuccess}
+          >
+            {forgotLoading ? (
+              <span style={s.btnRow}>
+                <span style={{ ...s.spinner, borderTopColor: "#080810" }} />{" "}
+                Sending...
+              </span>
+            ) : (
+              <span style={s.btnRow}>Send reset link →</span>
+            )}
+          </button>
+          <button
+            style={{
+              background: "none",
+              border: "none",
+              color: "#C8F135",
+              fontSize: "14px",
+              fontWeight: "700",
+              cursor: "pointer",
+              padding: 0,
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+            }}
+            onClick={() => {
+              setShowForgot(false);
+              setForgotEmail("");
+              setForgotSuccess("");
+            }}
+          >
+            ← Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main Login Screen ──────────────────────────────────
   return (
     <div style={s.root}>
-      {/* Dot grid */}
       <div style={s.dotGrid} />
-      {/* Glow orbs */}
       <div style={s.glow1} />
       <div style={s.glow2} />
 
-      {/* Card */}
       <div style={s.card} className="auth-card">
-
-        {/* Top gradient line */}
         <div style={s.topLine} />
 
-        {/* Logo */}
         <div style={s.logoRow}>
           <div style={s.logoMark}>💬</div>
           <span style={s.logoText}>OpenChat</span>
@@ -99,59 +295,124 @@ export default function Login() {
         <h1 style={s.title}>Welcome back</h1>
         <p style={s.subtitle}>Sign in to your dashboard</p>
 
-        {/* Error */}
         {error && (
           <div style={s.errorBox}>
             <span>⚠️</span> {error}
           </div>
         )}
 
-        {/* Fields */}
+        {/* Social Buttons */}
+        <div style={s.socialRow}>
+          <button
+            className="auth-social-btn"
+            style={s.socialBtn}
+            onClick={() => handleSocialLogin("google")}
+            disabled={!!socialLoading || loading}
+          >
+            {socialLoading === "google" ? (
+              <span style={s.spinnerDark} />
+            ) : (
+              <GoogleIcon />
+            )}
+            <span>Google</span>
+          </button>
+          <button
+            className="auth-social-btn"
+            style={s.socialBtn}
+            onClick={() => handleSocialLogin("github")}
+            disabled={!!socialLoading || loading}
+          >
+            {socialLoading === "github" ? (
+              <span style={s.spinnerDark} />
+            ) : (
+              <GitHubIcon />
+            )}
+            <span>GitHub</span>
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div style={s.divider}>
+          <span className="auth-divider-line" />
+          <span style={s.dividerText}>or continue with email</span>
+          <span className="auth-divider-line" />
+        </div>
+
+        {/* Email / Password */}
         <div style={s.field}>
           <label style={s.label}>Email address</label>
           <input
-            style={inputStyle('email')}
-            type="email" name="email"
+            style={inputStyle("email")}
+            type="email"
+            name="email"
             placeholder="you@example.com"
             value={form.email}
-            onChange={handleChange} onKeyDown={handleKeyDown}
-            onFocus={() => setFocused('email')} onBlur={() => setFocused('')}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setFocused("email")}
+            onBlur={() => setFocused("")}
             autoComplete="email"
           />
         </div>
 
         <div style={s.field}>
-          <label style={s.label}>Password</label>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}
+          >
+            <label style={{ ...s.label, margin: 0 }}>Password</label>
+            <button style={s.forgotBtn} onClick={() => setShowForgot(true)}>
+              Forgot password?
+            </button>
+          </div>
           <input
-            style={inputStyle('password')}
-            type="password" name="password"
+            style={inputStyle("password")}
+            type="password"
+            name="password"
             placeholder="••••••••"
             value={form.password}
-            onChange={handleChange} onKeyDown={handleKeyDown}
-            onFocus={() => setFocused('password')} onBlur={() => setFocused('')}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setFocused("password")}
+            onBlur={() => setFocused("")}
             autoComplete="current-password"
           />
         </div>
 
-        {/* Submit */}
         <button
           style={{ ...s.btn, opacity: loading ? 0.75 : 1 }}
           onClick={handleLogin}
-          disabled={loading}
-          onMouseEnter={e => { if (!loading) { e.currentTarget.style.boxShadow = '0 0 32px rgba(200,241,53,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 18px rgba(200,241,53,0.25)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+          disabled={loading || !!socialLoading}
+          onMouseEnter={(e) => {
+            if (!loading) {
+              e.currentTarget.style.boxShadow = "0 0 32px rgba(200,241,53,0.5)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = "0 0 18px rgba(200,241,53,0.25)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
         >
-          {loading
-            ? <span style={s.btnRow}><span style={s.spinner} /> Signing in...</span>
-            : <span style={s.btnRow}>Sign in →</span>
-          }
+          {loading ? (
+            <span style={s.btnRow}>
+              <span style={s.spinner} /> Signing in...
+            </span>
+          ) : (
+            <span style={s.btnRow}>Sign in →</span>
+          )}
         </button>
 
         <p style={s.footerText}>
-          Don't have an account?{' '}
-          <Link to="/register" style={s.footerLink}>Create one</Link>
+          Don't have an account?{" "}
+          <Link to="/register" style={s.footerLink}>
+            Create one
+          </Link>
         </p>
-
       </div>
 
       <p style={s.credit}>© 2026 OpenChat · MIT License</p>
@@ -161,133 +422,259 @@ export default function Login() {
 
 const s = {
   root: {
-    minHeight: '100vh',
-    display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#080810',
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#080810",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    position: 'relative', overflow: 'hidden',
-    padding: '24px',
+    position: "relative",
+    overflow: "hidden",
+    padding: "24px",
   },
   dotGrid: {
-    position: 'fixed', inset: 0,
-    backgroundImage: 'radial-gradient(rgba(255,255,255,0.032) 1px, transparent 1px)',
-    backgroundSize: '32px 32px',
-    pointerEvents: 'none', zIndex: 0,
+    position: "fixed",
+    inset: 0,
+    backgroundImage:
+      "radial-gradient(rgba(255,255,255,0.032) 1px, transparent 1px)",
+    backgroundSize: "32px 32px",
+    pointerEvents: "none",
+    zIndex: 0,
   },
   glow1: {
-    position: 'fixed', top: '25%', left: '50%',
-    transform: 'translate(-50%,-50%)',
-    width: '600px', height: '400px',
-    background: 'radial-gradient(ellipse, rgba(99,102,241,0.1) 0%, transparent 65%)',
-    pointerEvents: 'none', zIndex: 0,
+    position: "fixed",
+    top: "25%",
+    left: "50%",
+    transform: "translate(-50%,-50%)",
+    width: "600px",
+    height: "400px",
+    background:
+      "radial-gradient(ellipse, rgba(99,102,241,0.1) 0%, transparent 65%)",
+    pointerEvents: "none",
+    zIndex: 0,
   },
   glow2: {
-    position: 'fixed', top: '72%', left: '65%',
-    transform: 'translate(-50%,-50%)',
-    width: '400px', height: '300px',
-    background: 'radial-gradient(ellipse, rgba(200,241,53,0.05) 0%, transparent 65%)',
-    pointerEvents: 'none', zIndex: 0,
+    position: "fixed",
+    top: "72%",
+    left: "65%",
+    transform: "translate(-50%,-50%)",
+    width: "400px",
+    height: "300px",
+    background:
+      "radial-gradient(ellipse, rgba(200,241,53,0.05) 0%, transparent 65%)",
+    pointerEvents: "none",
+    zIndex: 0,
   },
   card: {
-    position: 'relative', zIndex: 1,
-    width: '100%', maxWidth: '420px',
-    backgroundColor: '#0F0F1A',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '20px',
-    padding: '44px 36px 36px',
-    boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03)',
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    boxSizing: 'border-box',
+    position: "relative",
+    zIndex: 1,
+    width: "100%",
+    maxWidth: "420px",
+    backgroundColor: "#0F0F1A",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: "20px",
+    padding: "44px 36px 36px",
+    boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    boxSizing: "border-box",
   },
   topLine: {
-    position: 'absolute', top: 0, left: '50%',
-    transform: 'translateX(-50%)',
-    width: '55%', height: '1px',
-    background: 'linear-gradient(90deg, transparent, rgba(200,241,53,0.7), transparent)',
-    borderRadius: '1px',
+    position: "absolute",
+    top: 0,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "55%",
+    height: "1px",
+    background:
+      "linear-gradient(90deg, transparent, rgba(200,241,53,0.7), transparent)",
+    borderRadius: "1px",
   },
   logoRow: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    marginBottom: '24px',
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    marginBottom: "24px",
   },
   logoMark: {
-    width: '36px', height: '36px',
-    background: '#C8F135', borderRadius: '10px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '18px',
-    boxShadow: '0 0 20px rgba(200,241,53,0.38)',
+    width: "36px",
+    height: "36px",
+    background: "#C8F135",
+    borderRadius: "10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "18px",
+    boxShadow: "0 0 20px rgba(200,241,53,0.38)",
     flexShrink: 0,
   },
   logoText: {
     fontFamily: "'Bricolage Grotesque', sans-serif",
-    fontSize: '20px', fontWeight: '800', color: '#EDEAF5',
+    fontSize: "20px",
+    fontWeight: "800",
+    color: "#EDEAF5",
   },
   title: {
     fontFamily: "'Bricolage Grotesque', sans-serif",
-    fontSize: '26px', fontWeight: '800',
-    color: '#EDEAF5', margin: '0 0 6px 0',
-    letterSpacing: '-0.025em',
+    fontSize: "26px",
+    fontWeight: "800",
+    color: "#EDEAF5",
+    margin: "0 0 6px 0",
+    letterSpacing: "-0.025em",
   },
   subtitle: {
-    fontSize: '14px', color: '#6B6B80',
-    margin: '0 0 28px 0', fontWeight: '400',
+    fontSize: "14px",
+    color: "#6B6B80",
+    margin: "0 0 24px 0",
+    fontWeight: "400",
   },
   errorBox: {
-    width: '100%', boxSizing: 'border-box',
-    backgroundColor: 'rgba(239,68,68,0.08)',
-    border: '1px solid rgba(239,68,68,0.22)',
-    color: '#FCA5A5', padding: '10px 14px',
-    borderRadius: '10px', fontSize: '13px',
-    marginBottom: '16px',
-    display: 'flex', alignItems: 'center', gap: '8px',
+    width: "100%",
+    boxSizing: "border-box",
+    backgroundColor: "rgba(239,68,68,0.08)",
+    border: "1px solid rgba(239,68,68,0.22)",
+    color: "#FCA5A5",
+    padding: "10px 14px",
+    borderRadius: "10px",
+    fontSize: "13px",
+    marginBottom: "16px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
   },
-  field: { width: '100%', marginBottom: '16px' },
+  successBox: {
+    width: "100%",
+    boxSizing: "border-box",
+    backgroundColor: "rgba(16,185,129,0.08)",
+    border: "1px solid rgba(16,185,129,0.22)",
+    color: "#6EE7B7",
+    padding: "10px 14px",
+    borderRadius: "10px",
+    fontSize: "13px",
+    marginBottom: "16px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  socialRow: {
+    display: "flex",
+    gap: "10px",
+    width: "100%",
+    marginBottom: "20px",
+  },
+  socialBtn: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    padding: "11px 16px",
+    minHeight: "44px",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: "10px",
+    color: "#EDEAF5",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+  },
+  divider: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    width: "100%",
+    marginBottom: "20px",
+  },
+  dividerText: {
+    fontSize: "12px",
+    color: "#3A3A52",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+  },
+  field: { width: "100%", marginBottom: "16px" },
   label: {
-    display: 'block', fontSize: '12px',
-    fontWeight: '600', color: '#6B6B80',
-    marginBottom: '8px', letterSpacing: '0.04em',
-    textTransform: 'uppercase',
+    display: "block",
+    fontSize: "12px",
+    fontWeight: "600",
+    color: "#6B6B80",
+    marginBottom: "8px",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
   },
   input: {
-    width: '100%', boxSizing: 'border-box',
-    padding: '13px 14px',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '10px', fontSize: '15px',
-    color: '#EDEAF5', outline: 'none',
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "13px 14px",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: "10px",
+    fontSize: "15px",
+    color: "#EDEAF5",
+    outline: "none",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    transition: 'border-color 0.2s, box-shadow 0.2s',
+    transition: "border-color 0.2s, box-shadow 0.2s",
+  },
+  forgotBtn: {
+    background: "none",
+    border: "none",
+    color: "#818CF8",
+    fontSize: "12px",
+    fontWeight: "600",
+    cursor: "pointer",
+    padding: 0,
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
   },
   btn: {
-    width: '100%', padding: '13px',
-    backgroundColor: '#C8F135', color: '#080810',
-    border: 'none', borderRadius: '10px',
-    fontSize: '15px', fontWeight: '700',
-    cursor: 'pointer', marginTop: '8px', marginBottom: '24px',
-    minHeight: '48px',
+    width: "100%",
+    padding: "13px",
+    backgroundColor: "#C8F135",
+    color: "#080810",
+    border: "none",
+    borderRadius: "10px",
+    fontSize: "15px",
+    fontWeight: "700",
+    cursor: "pointer",
+    marginTop: "8px",
+    marginBottom: "24px",
+    minHeight: "48px",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    boxShadow: '0 0 18px rgba(200,241,53,0.25)',
-    transition: 'opacity 0.2s, box-shadow 0.2s, transform 0.2s',
+    boxShadow: "0 0 18px rgba(200,241,53,0.25)",
+    transition: "opacity 0.2s, box-shadow 0.2s, transform 0.2s",
   },
   btnRow: {
-    display: 'flex', alignItems: 'center',
-    justifyContent: 'center', gap: '8px',
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
   },
   spinner: {
-    width: '14px', height: '14px',
-    border: '2px solid rgba(8,8,16,0.25)',
-    borderTopColor: '#080810',
-    borderRadius: '50%',
-    display: 'inline-block',
-    animation: 'authSpin 0.7s linear infinite',
+    width: "14px",
+    height: "14px",
+    border: "2px solid rgba(8,8,16,0.25)",
+    borderTopColor: "#080810",
+    borderRadius: "50%",
+    display: "inline-block",
+    animation: "authSpin 0.7s linear infinite",
   },
-  footerText: { fontSize: '14px', color: '#55556A', margin: 0 },
-  footerLink: {
-    color: '#C8F135', fontWeight: '700', textDecoration: 'none',
+  spinnerDark: {
+    width: "14px",
+    height: "14px",
+    border: "2px solid rgba(255,255,255,0.1)",
+    borderTopColor: "#EDEAF5",
+    borderRadius: "50%",
+    display: "inline-block",
+    animation: "authSpin 0.7s linear infinite",
   },
+  footerText: { fontSize: "14px", color: "#55556A", margin: 0 },
+  footerLink: { color: "#C8F135", fontWeight: "700", textDecoration: "none" },
   credit: {
-    position: 'relative', zIndex: 1,
-    marginTop: '20px', fontSize: '12px', color: '#2A2A3A',
+    position: "relative",
+    zIndex: 1,
+    marginTop: "20px",
+    fontSize: "12px",
+    color: "#2A2A3A",
   },
 };

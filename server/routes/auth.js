@@ -128,4 +128,75 @@ router.get('/me', verifyAgent, async (req, res) => {
   }
 });
 
+// ─── Social Login ─────────────────────────────────────────
+// Called after Firebase social auth on frontend
+// Frontend sends the Firebase ID token, we verify it and return a JWT
+router.post('/social', async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) return res.status(400).json({ error: 'ID token required' });
+  try {
+    // Verify the Firebase ID token
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const { uid, email, name, picture } = decoded;
+    const installId = uid;
+    // Check if user already exists in DB
+    const snap = await db.ref(`users/${installId}`).once('value');
+    const isNewUser = !snap.exists();
+    if (isNewUser) {
+      // Create a minimal user record — Setup wizard will fill the rest
+      await db.ref(`users/${installId}`).set({
+        profile: {
+          name: name || '',
+          email: email || '',
+          company: '',
+          website: '',
+          type: 'personal',
+          avatar: picture || '',
+        },
+        mode: null,
+        onboardingComplete: false,
+        emailVerified: true, // social login = already verified
+        createdAt: Date.now(),
+      });
+    }
+    // Issue JWT
+    const token = jwt.sign(
+      { installId, email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    // Issue Firebase custom token for Realtime DB access
+    const firebaseToken = await admin.auth().createCustomToken(installId);
+    res.json({
+      token,
+      firebaseToken,
+      installId,
+      isNewUser, // frontend uses this to decide: Setup wizard vs Dashboard
+    });
+  } catch (err) {
+    console.error('Social auth error:', err.message);
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
+// ─── Forgot Password ──────────────────────────────────────
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+  try {
+    // Check user exists first to avoid leaking user enumeration
+    // We still return success either way for security
+    await admin.auth().getUserByEmail(email).catch(() => null);
+    const resetLink = await admin.auth().generatePasswordResetLink(email);
+    // Send via your existing email service
+    const { sendPasswordResetEmail } = require('../services/emailService');
+    await sendPasswordResetEmail(email, resetLink);
+    res.json({ message: 'Password reset email sent.' });
+  } catch (err) {
+    console.error('Forgot password error:', err.message);
+    // Always return success to prevent email enumeration
+    res.json({ message: 'Password reset email sent.' });
+  }
+});
+
 module.exports = router;

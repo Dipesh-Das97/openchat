@@ -31,4 +31,22 @@ const sendVerificationEmail = async (toEmail, verificationLink, name) => {
   });
 };
 
-module.exports = { sendVerificationEmail };
+async function sendPasswordResetEmail(email, resetLink) {
+  await transporter.sendMail({
+    from: `"OpenChat" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: 'Reset your OpenChat password',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2>Reset your password</h2>
+        <p>Click the button below to reset your OpenChat password:</p>
+        <a href="${resetLink}" style="display:inline-block; padding: 12px 24px; background: #C8F135; color: #080810; border-radius: 8px; font-weight: 700; text-decoration: none;">
+          Reset Password
+        </a>
+        <p style="margin-top: 16px; color: #666; font-size: 13px;">If you didn't request this, ignore this email.</p>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendVerificationEmail, sendPasswordResetEmail };

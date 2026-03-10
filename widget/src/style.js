@@ -332,59 +332,61 @@ export const injectStyles = () => {
 
     /* ── Mobile ── */
     @media (max-width: 480px) {
-      /* Bubble stays fixed at bottom-right, smaller gap from edges */
+      /* Bubble: normal position when chat is closed */
       #openchat-bubble {
         bottom: 16px;
         right: 16px;
-        width: 48px;
-        height: 48px;
-        font-size: 20px;
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
       }
 
       /*
-       * Mobile chat window: tall bottom sheet, NOT full screen.
-       * Leaves ~80px at top so the page is still visible,
-       * and the bubble sits ABOVE the window (doesn't overlap).
+       * When chat is open on mobile, hide the bubble completely.
+       * The header close button (✕) handles closing.
+       * Add class "oc-chat-open" to <body> via index.js when opening.
+       */
+      body.oc-chat-open #openchat-bubble {
+        display: none !important;
+      }
+
+      /*
+       * Mobile chat window: true full-screen using dvh (dynamic viewport height).
+       * dvh = actual visible viewport AFTER browser chrome (address bar) is accounted for.
+       * Falls back to 100vh for older browsers.
+       * This ensures the header is ALWAYS visible at the top.
        */
       #openchat-window {
-        /* Anchor to bottom, stretch to edges */
+        top: 0;
         bottom: 0;
-        right: 0;
         left: 0;
+        right: 0;
         width: 100%;
-        border-radius: 18px 18px 0 0;
-
-        /*
-         * Height: fill most of the screen but leave space at top.
-         * env(safe-area-inset-bottom) handles iPhone home bar.
-         */
-        height: calc(85vh - env(safe-area-inset-bottom, 0px));
-        max-height: 620px;
-
-        /* Slide up from bottom on mobile instead of scale */
+        height: 100vh;       /* fallback */
+        height: 100dvh;      /* real mobile viewport — excludes browser chrome */
+        border-radius: 0;
         transform-origin: bottom center;
       }
       #openchat-window.oc-hidden {
         opacity: 0;
         pointer-events: none;
-        transform: translateY(40px);
+        transform: translateY(30px);
       }
 
-      /* Slightly larger tap targets on mobile */
+      /* Larger tap targets */
       .oc-send-btn {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
       }
-      /* Fix iOS font zoom: keep at 16px so iOS doesn't auto-zoom */
-      .oc-input {
-        font-size: 16px;
-      }
+
+      /* Prevent iOS auto-zoom on input focus */
+      .oc-input,
       .oc-collect-input {
         font-size: 16px;
       }
 
-      /* Add bottom padding so content clears the iPhone home indicator */
+      /* Safe area padding for iPhone home indicator */
       .oc-input-area {
         padding-bottom: max(10px, env(safe-area-inset-bottom));
       }

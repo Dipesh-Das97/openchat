@@ -146,6 +146,12 @@ const init = async () => {
     });
   };
 
+  function openChat() {
+  win.classList.remove('oc-hidden');
+  document.body.classList.add('oc-chat-open');   // hides bubble on mobile via CSS
+  setBubbleState(true);                           // shows ✕ icon on desktop
+}
+
   // ── Start chat session ──
   const startChat = async () => {
     const isReturning = !!localStorage.getItem(`oc_conversation_${installId}`);
@@ -161,6 +167,12 @@ const init = async () => {
       watchConversationStatus(conversationId);
     }
   };
+
+  function closeChat() {
+  win.classList.add('oc-hidden');
+  document.body.classList.remove('oc-chat-open'); // shows bubble again on mobile
+  setBubbleState(false);                           // shows 💬 icon on desktop
+}
 
   // ── Send handler ──
   const setupSendHandler = () => {
@@ -180,20 +192,11 @@ const init = async () => {
   // ── Toggle widget ──
   bubble.addEventListener('click', () => {
   const isHidden = win.classList.contains('oc-hidden');
-  if (isHidden) {
-    win.classList.remove('oc-hidden');
-    setBubbleState(true);   // show ✕ icon
-  } else {
-    win.classList.add('oc-hidden');
-    setBubbleState(false);  // show 💬 icon
-  }
+  isHidden ? openChat() : closeChat();
 });
 
   // ── Close button ──
-  document.getElementById('oc-close').addEventListener('click', () => {
-    win.classList.add('oc-hidden');
-    setBubbleState(false);
-  });
+  document.getElementById('oc-close').addEventListener('click', closeChat);
 };
 
 if (document.readyState === 'loading') {

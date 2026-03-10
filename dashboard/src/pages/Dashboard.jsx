@@ -848,7 +848,7 @@ export default function Dashboard() {
     if (!token || !installId) return;
     requestPermission();
     rehydrateFirebase();
-    fetch("http://localhost:5000/api/auth/me", {
+    fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())

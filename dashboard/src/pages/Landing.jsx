@@ -383,6 +383,26 @@ export default function Landing() {
     return () => obs.disconnect();
   }, []);
 
+  useEffect(() => {
+  window.OpenChatConfig = {
+    installId: 'pQPBF55AQNemTiYIj0utnWqSNTD3',
+  };
+  if (document.getElementById('oc-widget-script')) return;
+  const script = document.createElement('script');
+  script.id = 'oc-widget-script';
+  script.src = 'https://cdn.jsdelivr.net/gh/Dipesh-Das97/openchat@v1.0/widget/dist/widget.js';
+  script.async = true;
+  document.body.appendChild(script);
+  // Cleanup when navigating away
+  return () => {
+    document.getElementById('oc-widget-script')?.remove();
+    document.getElementById('openchat-bubble')?.remove();
+    document.getElementById('openchat-window')?.remove();
+    document.getElementById('oc-styles')?.remove();
+  };
+}, []);
+
+
   // Counter animation
   const statsRef = useRef(null);
   useEffect(() => {

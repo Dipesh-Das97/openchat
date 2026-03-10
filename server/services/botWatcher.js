@@ -78,37 +78,33 @@ const watchConversation = (conversationId, installId) => {
     watchedConversations.add(conversationId);
     console.log(`👂 Watching conversation: ${conversationId}`);
 
-    let initialized = false;
+    db.ref(`messages/${conversationId}`).once('value', (existingSnap) => {
+        const existingKeys = new Set(existingSnap.exists() ? Object.keys(existingSnap.val()) : []);
 
-    db.ref(`messages/${conversationId}`).on('child_added', async (msgSnap) => {
-        if (!initialized) {
-            setTimeout(() => { initialized = true; }, 1000);
-            return;
-        }
+        db.ref(`messages/${conversationId}`).on('child_added', async (msgSnap) => {
+            if (existingKeys.has(msgSnap.key)) return;
 
-        const msg = msgSnap.val();
-        if (!msg) return;
+            const msg = msgSnap.val();
+            if (!msg) return;
 
-        if (msg.sender === 'visitor') {
-            console.log(`💬 Visitor message in ${conversationId}: ${msg.text}`);
+            if (msg.sender === 'visitor') {
+                console.log(`💬 Visitor message in ${conversationId}: ${msg.text}`);
 
-            const online = await isAgentOnline(installId);
+                const online = await isAgentOnline(installId);
 
-            if (online) {
-                // Agent online — start 30s timer, AI kicks in if no response
-                console.log(`⏱ Agent online — starting escalation timer for ${conversationId}`);
-                startEscalationTimer(conversationId, installId, msg.text);
-            } else {
-                // Agent offline — AI takes over immediately, no timer
-                cancelEscalationTimer(conversationId); // safety: cancel any existing timer
-                triggerAiImmediately(conversationId, installId, msg.text);
+                if (online) {
+                    console.log(`⏱ Agent online — starting escalation timer for ${conversationId}`);
+                    startEscalationTimer(conversationId, installId, msg.text);
+                } else {
+                    cancelEscalationTimer(conversationId);
+                    triggerAiImmediately(conversationId, installId, msg.text);
+                }
+
+            } else if (msg.sender === 'agent') {
+                console.log(`✅ Agent replied in ${conversationId} — cancelling timer`);
+                cancelEscalationTimer(conversationId);
             }
-
-        } else if (msg.sender === 'agent') {
-            // Agent replied — cancel any pending timer
-            console.log(`✅ Agent replied in ${conversationId} — cancelling timer`);
-            cancelEscalationTimer(conversationId);
-        }
+        });
     });
 };
 

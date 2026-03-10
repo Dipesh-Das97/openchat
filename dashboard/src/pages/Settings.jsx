@@ -186,7 +186,7 @@ export default function Settings({ installId, token, agent }) {
   // ── Profile ────────────────────────────────────────────
   const [profile, setProfile] = useState({
     name: agent?.profile?.name || "",
-    company: agent?.profile?.company || "",
+    company: agent?.profile?.company || agent?.appearance?.companyName || "",
     website: agent?.profile?.website || "",
   });
 

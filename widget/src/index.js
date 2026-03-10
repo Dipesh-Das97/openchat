@@ -1,5 +1,5 @@
 import { injectStyles } from './style.js';
-import { buildBubble, buildChatWindow, addMessage, updateStatus, renderFormInChat, showLeadSuccess, unlockChat } from './ui.js';
+import { buildBubble, buildChatWindow, addMessage, updateStatus, renderFormInChat, showLeadSuccess, unlockChat, setBubbleState } from './ui.js';
 import { initFirebase, getDb, ref, onValue } from './firebase.js';
 import {
   getOrCreateConversation,
@@ -178,18 +178,21 @@ const init = async () => {
   };
 
   // ── Toggle widget ──
-  bubble.addEventListener('click', async () => {
-    const isHidden = win.classList.contains('oc-hidden');
-    win.classList.toggle('oc-hidden');
-    if (isHidden && !conversationId) {
-      await startChat();
-      setupSendHandler();
-    }
-  });
+  bubble.addEventListener('click', () => {
+  const isHidden = win.classList.contains('oc-hidden');
+  if (isHidden) {
+    win.classList.remove('oc-hidden');
+    setBubbleState(true);   // show ✕ icon
+  } else {
+    win.classList.add('oc-hidden');
+    setBubbleState(false);  // show 💬 icon
+  }
+});
 
   // ── Close button ──
   document.getElementById('oc-close').addEventListener('click', () => {
     win.classList.add('oc-hidden');
+    setBubbleState(false);
   });
 };
 

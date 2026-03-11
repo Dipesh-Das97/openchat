@@ -23,20 +23,16 @@ const init = async () => {
 
   const appearance = settings.appearance || {};
 
-  // ── Resolve all color values (config override → Firebase → defaults) ──
   const primaryColor   = config.primaryColor   || appearance.primaryColor   || '#4F46E5';
   const chatBg         = config.chatBg         || appearance.chatBg         || '#FFFFFF';
   const visitorBubble  = config.visitorBubble  || appearance.visitorBubble  || primaryColor;
   const agentBubble    = config.agentBubble    || appearance.agentBubble    || '#FFFFFF';
   const inputBg        = config.inputBg        || appearance.inputBg        || '#F9FAFB';
   const inputBorder    = config.inputBorder    || appearance.inputBorder    || '#E5E7EB';
-
   const position       = config.position       || appearance.position       || 'bottom-right';
   const companyName    = config.companyName    || appearance.companyName    || settings?.profile?.company || 'Support';
   const welcomeMessage = config.welcomeMessage || appearance.welcomeMessage || "Hi there! 👋 How can I help you today?";
 
-  // ── Derive readable text color from bubble background ──
-  // Converts hex → relative luminance → picks black or white text
   const hexLuminance = (hex) => {
     const c = hex.replace('#', '');
     const r = parseInt(c.substr(0,2),16) / 255;
@@ -53,7 +49,6 @@ const init = async () => {
   const visitorText = contrastText(visitorBubble);
   const agentText   = contrastText(agentBubble);
 
-  // ── Apply CSS variables ──
   const root = document.documentElement;
   root.style.setProperty('--oc-primary',        primaryColor);
   root.style.setProperty('--oc-chat-bg',        chatBg);
@@ -82,7 +77,6 @@ const init = async () => {
   const watchConversationStatus = (convId) => {
     const db = getDb();
 
-    // Closed conversation
     onValue(ref(db, `conversations/${installId}/${convId}/status`), (snap) => {
       if (snap.val() === 'closed') {
         localStorage.removeItem(`oc_conversation_${installId}`);
@@ -96,7 +90,6 @@ const init = async () => {
         if (sendBtn) sendBtn.disabled = true;
       }
 
-      // Agent took over — remove form, unlock input
       if (snap.val() === 'open') {
         const form = document.getElementById('oc-lead-form');
         if (form) { form.remove(); formShown = false; }
@@ -104,7 +97,6 @@ const init = async () => {
       }
     });
 
-    // Form requested by agent or AI
     onValue(ref(db, `conversations/${installId}/${convId}/formRequestedBy`), (snap) => {
       const by = snap.val();
       if (!by) return;
@@ -127,8 +119,8 @@ const init = async () => {
     const input      = document.getElementById('oc-input');
     const sendBtn    = document.getElementById('oc-send');
     if (input) {
-      input.disabled           = true;
-      input.placeholder        = 'Fill in the form above to continue...';
+      input.disabled              = true;
+      input.placeholder           = 'Fill in the form above to continue...';
       input.style.backgroundColor = '#F3F4F6';
       input.style.color           = '#9CA3AF';
       input.style.cursor          = 'not-allowed';
@@ -146,11 +138,21 @@ const init = async () => {
     });
   };
 
+  // ── Open / close ──
+  // We hide/show the bubble via direct inline style instead of a body CSS class.
+  // This works correctly inside iframes (Wix, WordPress, Shopify) where adding
+  // a class to document.body does not affect the parent page's CSS cascade.
   function openChat() {
-  win.classList.remove('oc-hidden');
-  document.body.classList.add('oc-chat-open');   // hides bubble on mobile via CSS
-  setBubbleState(true);                           // shows ✕ icon on desktop
-}
+    win.classList.remove('oc-hidden');
+    bubble.style.display = 'none';   // hide bubble directly — works in all platforms
+    setBubbleState(true);
+  }
+
+  function closeChat() {
+    win.classList.add('oc-hidden');
+    bubble.style.display = 'flex';   // show bubble again
+    setBubbleState(false);
+  }
 
   // ── Start chat session ──
   const startChat = async () => {
@@ -168,12 +170,6 @@ const init = async () => {
     }
   };
 
-  function closeChat() {
-  win.classList.add('oc-hidden');
-  document.body.classList.remove('oc-chat-open'); // shows bubble again on mobile
-  setBubbleState(false);                           // shows 💬 icon on desktop
-}
-
   // ── Send handler ──
   const setupSendHandler = () => {
     const input   = document.getElementById('oc-input');
@@ -190,10 +186,16 @@ const init = async () => {
   };
 
   // ── Toggle widget ──
-  bubble.addEventListener('click', () => {
-  const isHidden = win.classList.contains('oc-hidden');
-  isHidden ? openChat() : closeChat();
-});
+  bubble.addEventListener('click', async () => {
+    const isHidden = win.classList.contains('oc-hidden');
+    if (isHidden) {
+      openChat();
+      if (!conversationId) await startChat();
+      setupSendHandler();
+    } else {
+      closeChat();
+    }
+  });
 
   // ── Close button ──
   document.getElementById('oc-close').addEventListener('click', closeChat);

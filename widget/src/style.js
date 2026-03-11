@@ -3,11 +3,6 @@ export const injectStyles = () => {
   const style = document.createElement('style');
   style.id = 'oc-styles';
   style.innerHTML = `
-    /*
-     * ── OpenChat CSS Variables ──────────────────────────────
-     * All set dynamically by index.js from Firebase appearance settings.
-     * Defaults here are the fallback if nothing is saved yet.
-     */
     :root {
       --oc-primary:        #4F46E5;
       --oc-chat-bg:        #F9FAFB;
@@ -41,7 +36,6 @@ export const injectStyles = () => {
     }
     #openchat-bubble:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(0,0,0,0.28); }
 
-    /* Icon states inside bubble */
     .oc-bubble-icon {
       display: flex;
       align-items: center;
@@ -54,7 +48,6 @@ export const injectStyles = () => {
       font-weight: 700;
     }
 
-    /* Badge */
     #openchat-bubble .oc-badge {
       position: absolute;
       top: -4px;
@@ -164,7 +157,6 @@ export const injectStyles = () => {
       flex-direction: column;
       gap: 8px;
       background: var(--oc-chat-bg);
-      /* Smooth scroll on iOS */
       -webkit-overflow-scrolling: touch;
     }
 
@@ -245,13 +237,11 @@ export const injectStyles = () => {
       border-radius: 24px;
       border: 1px solid var(--oc-input-border);
       background: var(--oc-input-bg);
-      font-size: 13px;
+      font-size: 16px;
       outline: none;
       font-family: inherit;
       color: #111827;
       transition: border-color 0.2s;
-      /* Prevent iOS zoom on focus (font-size must be >= 16px OR use this) */
-      font-size: max(13px, 16px);
     }
     .oc-input:focus { border-color: var(--oc-primary); }
     .oc-input:disabled {
@@ -295,7 +285,7 @@ export const injectStyles = () => {
       border-radius: 8px;
       border: 1px solid var(--oc-input-border);
       background: var(--oc-input-bg);
-      font-size: 13px;
+      font-size: 16px;
       outline: none;
       box-sizing: border-box;
       font-family: inherit;
@@ -332,7 +322,6 @@ export const injectStyles = () => {
 
     /* ── Mobile ── */
     @media (max-width: 480px) {
-      /* Bubble: normal position when chat is closed */
       #openchat-bubble {
         bottom: 16px;
         right: 16px;
@@ -342,56 +331,56 @@ export const injectStyles = () => {
       }
 
       /*
-       * When chat is open on mobile, hide the bubble completely.
-       * The header close button (✕) handles closing.
-       * Add class "oc-chat-open" to <body> via index.js when opening.
-       */
-      body.oc-chat-open #openchat-bubble {
-        display: none !important;
-      }
-
-      /*
-       * Mobile chat window: true full-screen using dvh (dynamic viewport height).
-       * dvh = actual visible viewport AFTER browser chrome (address bar) is accounted for.
-       * Falls back to 100vh for older browsers.
-       * This ensures the header is ALWAYS visible at the top.
+       * Mobile full-screen chat window.
+       * Uses safe-area-inset-top so header is NEVER hidden under browser chrome.
+       * dvh = dynamic viewport height, accounts for address bar on iOS/Android.
        */
       #openchat-window {
+        position: fixed;
         top: 0;
-        bottom: 0;
         left: 0;
         right: 0;
+        bottom: 0;
         width: 100%;
-        height: 100vh;       /* fallback */
-        height: 100dvh;      /* real mobile viewport — excludes browser chrome */
+        /* Fallback for browsers without dvh support */
+        height: 100vh;
+        /* Real visible height — excludes browser address bar */
+        height: 100dvh;
         border-radius: 0;
         transform-origin: bottom center;
       }
+
+      /*
+       * Push header down by the safe area so it's never hidden under
+       * the browser's status bar / notch on iOS and Android.
+       */
+      .oc-header {
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      }
+
       #openchat-window.oc-hidden {
         opacity: 0;
         pointer-events: none;
         transform: translateY(30px);
       }
 
-      /* Larger tap targets */
       .oc-send-btn {
         width: 42px;
         height: 42px;
         min-width: 42px;
       }
 
-      /* Prevent iOS auto-zoom on input focus */
       .oc-input,
       .oc-collect-input {
         font-size: 16px;
       }
 
-      /* Safe area padding for iPhone home indicator */
+      /* Safe area for iPhone home indicator */
       .oc-input-area {
-        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
       }
       .oc-powered {
-        padding-bottom: max(8px, env(safe-area-inset-bottom));
+        padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
       }
     }
   `;

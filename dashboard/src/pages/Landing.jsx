@@ -384,23 +384,23 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-  window.OpenChatConfig = {
-    installId: 'pQPBF55AQNemTiYIj0utnWqSNTD3',
-  };
-  if (document.getElementById('oc-widget-script')) return;
-  const script = document.createElement('script');
-  script.id = 'oc-widget-script';
-  script.src = 'https://cdn.jsdelivr.net/gh/Dipesh-Das97/openchat@v1.0/widget/dist/widget.js';
-  script.async = true;
-  document.body.appendChild(script);
-  // Cleanup when navigating away
-  return () => {
-    document.getElementById('oc-widget-script')?.remove();
-    document.getElementById('openchat-bubble')?.remove();
-    document.getElementById('openchat-window')?.remove();
-    document.getElementById('oc-styles')?.remove();
-  };
-}, []);
+    window.OpenChatConfig = {
+      installId: 'pQPBF55AQNemTiYIj0utnWqSNTD3',
+    };
+    if (document.getElementById('oc-widget-script')) return;
+    const script = document.createElement('script');
+    script.id = 'oc-widget-script';
+    script.src = 'https://cdn.jsdelivr.net/gh/Dipesh-Das97/openchat@v1.1/widget/dist/widget.js';
+    script.async = true;
+    document.body.appendChild(script);
+    // Cleanup when navigating away
+    return () => {
+      document.getElementById('oc-widget-script')?.remove();
+      document.getElementById('openchat-bubble')?.remove();
+      document.getElementById('openchat-window')?.remove();
+      document.getElementById('oc-styles')?.remove();
+    };
+  }, []);
 
 
   // Counter animation
@@ -489,7 +489,7 @@ export default function Landing() {
             <div className="lp-mock-body">
               {/* Sidebar */}
               <div className="lp-dsidebar">
-                {['🏠','🗨️','📋','📦','⚙️'].map((ic, i) => (
+                {['🏠', '🗨️', '📋', '📦', '⚙️'].map((ic, i) => (
                   <div key={i} className={`lp-dnav${i === 1 ? ' on' : ''}`}>{ic}</div>
                 ))}
               </div>
@@ -615,17 +615,17 @@ export default function Landing() {
                 </div>
                 <div className="lp-analytics">
                   <div className="lp-arow">
-                    {[{v:'24',c:'g',l:'Total Chats'},{v:'11',c:'i',l:'Total Leads'},{v:'8',c:'vi',l:'Open'},{v:'3',c:'a',l:'Converted'}].map((a,i) => (
+                    {[{ v: '24', c: 'g', l: 'Total Chats' }, { v: '11', c: 'i', l: 'Total Leads' }, { v: '8', c: 'vi', l: 'Open' }, { v: '3', c: 'a', l: 'Converted' }].map((a, i) => (
                       <div key={i} className="lp-acard"><div className={`v ${a.c}`}>{a.v}</div><div className="l">{a.l}</div></div>
                     ))}
                   </div>
                   <div className="lp-chart">
                     <div className="lp-chart-title">Conversations · Last 7 days</div>
                     <div className="lp-bars">
-                      {[30,55,40,70,50,85,100].map((h, i) => (
+                      {[30, 55, 40, 70, 50, 85, 100].map((h, i) => (
                         <div key={i} className="b" style={{
                           height: `${h}%`,
-                          background: i === 6 ? 'var(--indigo)' : `rgba(99,102,241,${0.2 + h/200})`,
+                          background: i === 6 ? 'var(--indigo)' : `rgba(99,102,241,${0.2 + h / 200})`,
                           boxShadow: i === 6 ? '0 0 12px var(--indigo-g)' : 'none',
                         }} />
                       ))}
@@ -633,7 +633,7 @@ export default function Landing() {
                   </div>
                   <div className="lp-sbars">
                     <div className="lp-chart-title" style={{ marginTop: 14, marginBottom: 8 }}>Leads by service</div>
-                    {[['Web Development',6,100],['Mobile App',4,67],['SEO / Marketing',3,50],['UI/UX Design',2,33]].map(([n,c,w]) => (
+                    {[['Web Development', 6, 100], ['Mobile App', 4, 67], ['SEO / Marketing', 3, 50], ['UI/UX Design', 2, 33]].map(([n, c, w]) => (
                       <div key={n} className="lp-sb">
                         <div className="lp-sb-top"><span className="lp-sb-name">{n}</span><span className="lp-sb-cnt">{c}</span></div>
                         <div className="lp-sb-track"><div className="lp-sb-fill" style={{ width: `${w}%` }} /></div>
@@ -658,10 +658,10 @@ export default function Landing() {
             <div className="lp-tline" />
             <div className="lp-tsteps">
               {[
-                { cls:'n1', icon:'⚙️', step:'Step 01', title:'Sign up & configure', desc:'Create an account, set your brand colors, welcome message, and enable features — AI reply, lead form, working hours.' },
-                { cls:'n2', icon:'📦', step:'Step 02', title:'Copy your embed code', desc:'Head to the Docs tab in your dashboard. Your install ID is pre-filled. Copy two lines.' },
-                { cls:'n3', icon:'🚀', step:'Step 03', title:'Paste & publish', desc:'Drop the snippet before your </body> tag — or follow the guide for React, WordPress, Shopify, or Wix.' },
-                { cls:'n4', icon:'💬', step:'Step 04', title:'Start converting', desc:'Toggle online in your dashboard. Chat with visitors live. AI handles the rest when you\'re away.' },
+                { cls: 'n1', icon: '⚙️', step: 'Step 01', title: 'Sign up & configure', desc: 'Create an account, set your brand colors, welcome message, and enable features — AI reply, lead form, working hours.' },
+                { cls: 'n2', icon: '📦', step: 'Step 02', title: 'Copy your embed code', desc: 'Head to the Docs tab in your dashboard. Your install ID is pre-filled. Copy two lines.' },
+                { cls: 'n3', icon: '🚀', step: 'Step 03', title: 'Paste & publish', desc: 'Drop the snippet before your </body> tag — or follow the guide for React, WordPress, Shopify, or Wix.' },
+                { cls: 'n4', icon: '💬', step: 'Step 04', title: 'Start converting', desc: 'Toggle online in your dashboard. Chat with visitors live. AI handles the rest when you\'re away.' },
               ].map((s, i) => (
                 <div key={i} className={`lp-tstep${i > 0 ? ` lp-d${i}` : ''}`}>
                   <div className={`lp-tnode ${s.cls}`}>{s.icon}</div>
@@ -718,7 +718,7 @@ export default function Landing() {
               <div className="lp-mode-desc">Feed your knowledge base — services, FAQs, pricing. AI answers instantly. Falls back to lead capture when it can't help.</div>
               <div className="lp-aimock">
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, fontWeight: 700 }}>Knowledge Base</div>
-                {[['💰','Pricing & Plans',true],['🛠️','Services Offered',true],['📞','Contact & Support',true],['❓','FAQ',false]].map(([ic,lbl,on]) => (
+                {[['💰', 'Pricing & Plans', true], ['🛠️', 'Services Offered', true], ['📞', 'Contact & Support', true], ['❓', 'FAQ', false]].map(([ic, lbl, on]) => (
                   <div key={lbl} className="lp-airow">
                     <div className="lp-aiicon">{ic}</div>
                     <div className="lp-aitxt">{lbl}</div>
@@ -741,7 +741,7 @@ export default function Landing() {
               <div className="lp-mode-desc">Capture name, email, phone, services of interest. Track pipeline status. Export CSV. All from your dashboard.</div>
               <div className="lp-lmock">
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, fontWeight: 700 }}>Recent Leads</div>
-                {[['Priya Sharma','Web Development','new'],['Rahul Mehta','Mobile App','hot'],['Alex Chen','SEO / Marketing','conv'],['Sara Kim','UI/UX Design','new']].map(([name,svc,badge]) => (
+                {[['Priya Sharma', 'Web Development', 'new'], ['Rahul Mehta', 'Mobile App', 'hot'], ['Alex Chen', 'SEO / Marketing', 'conv'], ['Sara Kim', 'UI/UX Design', 'new']].map(([name, svc, badge]) => (
                   <div key={name} className="lp-lrow">
                     <div><div className="lp-lname">{name}</div><div className="lp-lsvc">{svc}</div></div>
                     <span className={`lp-lbadge ${badge}`}>{badge === 'conv' ? 'Converted' : badge === 'hot' ? 'Hot' : 'New'}</span>
@@ -763,10 +763,10 @@ export default function Landing() {
               <h2 className="lp-h2 lp-reveal">Two lines.<br />That's the whole<br />integration.</h2>
               <div className="lp-eps lp-reveal" style={{ marginTop: 32 }}>
                 {[
-                  ['1','Set your config','Your install ID is pre-filled in the Docs tab. Optionally pass a brand color and company name.'],
-                  ['2','Load the widget','One script tag. The widget loads async — zero impact on your page performance or Core Web Vitals.'],
-                  ['3','Works everywhere','Plain HTML, React/Next.js, WordPress, Shopify, Wix, Webflow — each platform has a dedicated guide.'],
-                ].map(([n,t,d]) => (
+                  ['1', 'Set your config', 'Your install ID is pre-filled in the Docs tab. Optionally pass a brand color and company name.'],
+                  ['2', 'Load the widget', 'One script tag. The widget loads async — zero impact on your page performance or Core Web Vitals.'],
+                  ['3', 'Works everywhere', 'Plain HTML, React/Next.js, WordPress, Shopify, Wix, Webflow — each platform has a dedicated guide.'],
+                ].map(([n, t, d]) => (
                   <div key={n} className="lp-ep">
                     <div className="lp-epnum">{n}</div>
                     <div><div className="lp-ep-title">{t}</div><div className="lp-ep-desc">{d}</div></div>
@@ -774,7 +774,7 @@ export default function Landing() {
                 ))}
               </div>
               <div className="lp-ppills lp-reveal">
-                {['🌐 HTML','⚛️ React','🔵 WordPress','🛍️ Shopify','🟡 Wix','🔷 Webflow'].map(p => (
+                {['🌐 HTML', '⚛️ React', '🔵 WordPress', '🛍️ Shopify', '🟡 Wix', '🔷 Webflow'].map(p => (
                   <span key={p} className="lp-ppill">{p}</span>
                 ))}
               </div>
@@ -786,8 +786,9 @@ export default function Landing() {
                 <span className="lp-cfile">index.html</span>
               </div>
               <pre className="lp-pre">
-                <code className="lp-code" dangerouslySetInnerHTML={{ __html:
-`<span class="tc">&lt;!-- Before &lt;/body&gt; --&gt;</span>
+                <code className="lp-code" dangerouslySetInnerHTML={{
+                  __html:
+                    `<span class="tc">&lt;!-- Before &lt;/body&gt; --&gt;</span>
 
 <span class="tk">&lt;script&gt;</span>
   <span class="ta">window.OpenChatConfig</span> = {
@@ -841,18 +842,22 @@ export default function Landing() {
           href="https://dipeshdas98.wixstudio.com/my-portfolio"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ display:'flex', alignItems:'center', gap:'10px', textDecoration:'none',
-            opacity:0.55, transition:'opacity 0.2s' }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none',
+            opacity: 0.55, transition: 'opacity 0.2s'
+          }}
           onMouseEnter={e => e.currentTarget.style.opacity = 1}
           onMouseLeave={e => e.currentTarget.style.opacity = 0.55}
         >
           <img
             src="https://firebasestorage.googleapis.com/v0/b/homerunner-staging.appspot.com/o/businessImages%2FChatGPT%20Image%20Feb%2021%2C%202026%2C%2001_23_21%20PM-Photoroom.png?alt=media&token=a804b2ab-306e-4369-a6b0-7d4b4c1bc3eb"
             alt="codedbyDipesh"
-            style={{ height:'100px', filter:'brightness(20)' }}
+            style={{ height: '100px', filter: 'brightness(20)' }}
           />
-          <span style={{ fontSize:'12px', color:'var(--muted2)',
-            fontFamily:"'Plus Jakarta Sans', sans-serif", fontWeight:500 }}>
+          <span style={{
+            fontSize: '12px', color: 'var(--muted2)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 500
+          }}>
             Dipesh Das
           </span>
         </a>

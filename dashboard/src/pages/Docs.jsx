@@ -120,12 +120,17 @@ export default function OpenChatWidget() {
     };
 
     const script = document.createElement('script');
-    script.src =
-      'https://cdn.jsdelivr.net/gh/Dipesh-Das97/openchat@v1.0/widget/dist/widget.js';
-    script.async = true;
-    document.body.appendChild(script);
+    script.id = 'oc-widget-script';
+script.src = 'https://cdn.jsdelivr.net/gh/Dipesh-Das97/openchat@v1.1/widget/dist/widget.js';
+script.async = true;
+document.body.appendChild(script);
 
-    return () => { document.body.removeChild(script); };
+return () => {
+  document.getElementById('oc-widget-script')?.remove();
+  document.getElementById('openchat-bubble')?.remove();
+  document.getElementById('openchat-window')?.remove();
+  document.getElementById('oc-styles')?.remove();
+};
   }, []);
 
   return null;
@@ -175,7 +180,7 @@ export default function Docs({ installId }) {
   const [selectedPlatform, setSelectedPlatform] = useState('html');
   const [copied, setCopied] = useState(false);
 
-  const platform  = PLATFORMS.find(p => p.id === selectedPlatform);
+  const platform = PLATFORMS.find(p => p.id === selectedPlatform);
   const embedCode = getEmbedCode(installId, selectedPlatform);
 
   const handleCopy = () => {
@@ -288,7 +293,7 @@ export default function Docs({ installId }) {
             <div style={s.codeWrap}>
               <div style={s.codeBar}>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  {['#FF5F57','#FFBD2E','#28CA41'].map(c => (
+                  {['#FF5F57', '#FFBD2E', '#28CA41'].map(c => (
                     <div key={c} style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: c }} />
                   ))}
                 </div>
@@ -379,7 +384,7 @@ const s = {
   },
   platformInfo: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 },
   platformLabel: { fontSize: '13px', fontWeight: '600', lineHeight: 1.3, transition: 'color 0.15s' },
-  platformDesc:  { fontSize: '10px', color: '#3A3A52', lineHeight: 1.3, marginTop: '1px' },
+  platformDesc: { fontSize: '10px', color: '#3A3A52', lineHeight: 1.3, marginTop: '1px' },
 
   // Main
   main: {
@@ -447,8 +452,8 @@ const s = {
     borderRadius: '14px', padding: '18px 20px',
   },
   tipsTitle: { fontSize: '13px', fontWeight: '700', color: '#C8F135', margin: '0 0 12px 0' },
-  tipsList:  { display: 'flex', flexDirection: 'column', gap: '8px' },
-  tipRow:    { display: 'flex', gap: '10px', alignItems: 'flex-start' },
-  tipDot:    { color: '#C8F135', fontWeight: '700', flexShrink: 0, fontSize: '12px', marginTop: '2px' },
-  tipText:   { fontSize: '13px', color: '#6B6B80', lineHeight: '1.6' },
+  tipsList: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  tipRow: { display: 'flex', gap: '10px', alignItems: 'flex-start' },
+  tipDot: { color: '#C8F135', fontWeight: '700', flexShrink: 0, fontSize: '12px', marginTop: '2px' },
+  tipText: { fontSize: '13px', color: '#6B6B80', lineHeight: '1.6' },
 };
